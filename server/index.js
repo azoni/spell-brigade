@@ -9,8 +9,9 @@ import admin from 'firebase-admin';
 // CONFIG
 // ===========================================
 const PORT = process.env.PORT || 3001;
-const TICK_RATE = 30;
+const TICK_RATE = 20; // Reduced from 30 for performance
 const TICK_INTERVAL = 1000 / TICK_RATE;
+const MAX_ENEMIES = 100; // Hard cap on total enemies
 
 // ===========================================
 // FIREBASE SETUP
@@ -203,7 +204,7 @@ const PORTALS = {
     id: 'sanctuary_to_meadow',
     name: 'Meadow Path',
     from: { x: 3000, y: 2350 },
-    to: { x: 3000, y: 2100 },
+    to: { x: 3000, y: 1900 },  // Further into meadow
     fromZone: 'sanctuary',
     toZone: 'meadow',
     color: '#84cc16',
@@ -213,7 +214,7 @@ const PORTALS = {
     id: 'meadow_to_forest',
     name: 'Forest Gateway',
     from: { x: 1900, y: 2000 },
-    to: { x: 1700, y: 2000 },
+    to: { x: 1400, y: 1800 },  // Deeper into forest
     fromZone: 'meadow',
     toZone: 'forest',
     color: '#166534',
@@ -223,7 +224,7 @@ const PORTALS = {
     id: 'meadow_to_volcanic',
     name: 'Flame Portal',
     from: { x: 4100, y: 2000 },
-    to: { x: 4300, y: 2000 },
+    to: { x: 4600, y: 1800 },  // Into volcanic region
     fromZone: 'meadow',
     toZone: 'volcanic',
     color: '#dc2626',
@@ -233,7 +234,7 @@ const PORTALS = {
     id: 'meadow_to_frozen',
     name: 'Frozen Gate',
     from: { x: 3000, y: 3100 },
-    to: { x: 3000, y: 3400 },
+    to: { x: 3000, y: 3700 },  // Deep into frozen
     fromZone: 'meadow',
     toZone: 'frozen',
     color: '#0ea5e9',
@@ -243,7 +244,7 @@ const PORTALS = {
     id: 'forest_to_abyss',
     name: 'Void Rift',
     from: { x: 600, y: 1200 },
-    to: { x: 400, y: 800 },
+    to: { x: 300, y: 600 },  // Into the abyss
     fromZone: 'forest',
     toZone: 'abyss',
     color: '#581c87',
@@ -253,7 +254,7 @@ const PORTALS = {
     id: 'volcanic_to_crystal',
     name: 'Crystal Passage',
     from: { x: 5000, y: 3100 },
-    to: { x: 5000, y: 3400 },
+    to: { x: 5200, y: 3700 },  // Into crystal caves
     fromZone: 'volcanic',
     toZone: 'crystal_caves',
     color: '#ec4899',
@@ -951,6 +952,12 @@ app.get('/', (req, res) => {
     status: 'running',
     players: gameState.players.size,
     enemies: gameState.enemies.size,
+    projectiles: gameState.projectiles.size,
+    xpOrbs: gameState.xpOrbs.size,
+    particles: gameState.particles.length,
+    damageNumbers: gameState.damageNumbers.length,
+    tickRate: TICK_RATE,
+    maxEnemies: MAX_ENEMIES,
     uptime: process.uptime(),
   });
 });
@@ -1024,6 +1031,10 @@ function pointToLineDistance(point, lineStart, lineEnd) {
 // XP ORBS
 // ===========================================
 function spawnXpOrb(x, y, amount) {
+  // Limit XP orbs to prevent lag
+  if (gameState.xpOrbs.size > 200) {
+    return; // Skip spawning more
+  }
   const id = uuidv4();
   // Scatter slightly from death position
   const scatter = 20;
@@ -1041,6 +1052,10 @@ function spawnXpOrb(x, y, amount) {
 // DAMAGE NUMBERS
 // ===========================================
 function spawnDamageNumber(x, y, amount, isCrit = false) {
+  // Limit damage numbers to prevent lag
+  if (gameState.damageNumbers.length > 50) {
+    gameState.damageNumbers.shift(); // Remove oldest
+  }
   gameState.damageNumbers.push({
     id: uuidv4(),
     x: x + (Math.random() - 0.5) * 20,
@@ -1048,7 +1063,7 @@ function spawnDamageNumber(x, y, amount, isCrit = false) {
     amount: Math.round(amount),
     isCrit,
     createdAt: Date.now(),
-    lifetime: 1000,
+    lifetime: 800, // Reduced from 1000
   });
 }
 
@@ -1056,6 +1071,10 @@ function spawnDamageNumber(x, y, amount, isCrit = false) {
 // PARTICLES
 // ===========================================
 function spawnParticles(x, y, color, count = 5) {
+  // Limit total particles to prevent lag
+  if (gameState.particles.length > 150) {
+    gameState.particles.splice(0, count); // Remove oldest
+  }
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
     const speed = 50 + Math.random() * 100;
@@ -1114,6 +1133,11 @@ function spawnEnemyInZone(zoneId) {
 }
 
 function spawnEnemy(forceType = null, position = null, levelBoost = 0, xpMultiplier = 1) {
+  // Hard cap on total enemies
+  if (gameState.enemies.size >= MAX_ENEMIES) {
+    return null;
+  }
+  
   const id = uuidv4();
   const pos = position || getSpawnPosition();
   
@@ -1477,6 +1501,11 @@ function initZoneBosses() {
 // PROJECTILE CREATION
 // ===========================================
 function createProjectile(player, spell, targetX, targetY) {
+  // Limit projectiles to prevent lag
+  if (gameState.projectiles.size > 300) {
+    return null;
+  }
+  
   const id = uuidv4();
   const dir = normalize({ x: targetX - player.x, y: targetY - player.y });
   const upgrades = player.spellUpgrades || [];
@@ -1589,6 +1618,42 @@ function gameTick() {
       player.y = clamp(player.y, 20, WORLD.height - 20);
     }
 
+    // Automatic portal entry
+    if (!player.portalCooldown || now > player.portalCooldown) {
+      for (const [portalId, portal] of Object.entries(PORTALS)) {
+        const distToPortal = distance(player, portal.from);
+        if (distToPortal < 45) {
+          // Check level requirement
+          if (player.level >= portal.requiredLevel) {
+            // Teleport!
+            const oldX = player.x;
+            const oldY = player.y;
+            player.x = portal.to.x;
+            player.y = portal.to.y;
+            player.portalCooldown = now + 1000; // 1 second cooldown
+            
+            // Notify client
+            const socket = io.sockets.sockets.get(player.socketId);
+            if (socket) {
+              socket.emit('portalUsed', {
+                portalId,
+                fromX: oldX,
+                fromY: oldY,
+                toX: portal.to.x,
+                toY: portal.to.y,
+                toZone: portal.toZone,
+                color: portal.color,
+              });
+            }
+            
+            io.emit('sound', { type: 'portalEnter', x: oldX, y: oldY });
+            io.emit('sound', { type: 'portalExit', x: portal.to.x, y: portal.to.y });
+            break;
+          }
+        }
+      }
+    }
+
     // Animation frame
     player.animTime = (player.animTime || 0) + dt;
     if (player.animTime > 0.15) {
@@ -1631,10 +1696,15 @@ function gameTick() {
       }
     }
 
-    // Health regen in safe zone
-    const distToSafe = distance(player, ZONES.sanctuary);
-    if (distToSafe < ZONES.sanctuary.radius) {
-      player.health = Math.min(player.health + 5 * dt, player.maxHealth);
+    // Health regen in sanctuary (safe zone)
+    const playerZone = getZoneAtPosition(player.x, player.y);
+    const inSanctuary = playerZone?.id === 'sanctuary';
+    
+    if (inSanctuary && player.health < player.maxHealth) {
+      player.health = Math.min(player.health + 10 * dt, player.maxHealth);
+      player.isHealing = true;
+    } else {
+      player.isHealing = false;
     }
   }
 
@@ -1657,11 +1727,22 @@ function gameTick() {
     const isSlowed = enemy.slowedUntil > now;
     const currentSpeed = isSlowed ? enemy.baseSpeed * 0.5 : enemy.baseSpeed;
 
-    // Find nearest player
+    // Get enemy's zone
+    const enemyZone = enemy.zone ? ZONES[enemy.zone] : null;
+    
+    // Find nearest player IN THE SAME ZONE (anti-cheese)
     let nearestPlayer = null;
     let nearestDist = Infinity;
 
     for (const player of alivePlayers) {
+      // Get player's zone
+      const playerZone = getZoneAtPosition(player.x, player.y);
+      
+      // Only aggro if player is in the same zone as enemy
+      if (enemyZone && playerZone && playerZone.id !== enemyZone.id) {
+        continue; // Skip - player not in our zone
+      }
+      
       const dist = distance(enemy, player);
       if (dist < nearestDist) {
         nearestDist = dist;
@@ -1692,7 +1773,14 @@ function gameTick() {
     }
 
     // ========== ZONE BOSS ATTACKS ==========
+    // Only attack players in same zone (nearestPlayer is already filtered)
     if (enemy.isBoss && nearestPlayer) {
+      // Additional check: don't attack players in sanctuary
+      const targetZone = getZoneAtPosition(nearestPlayer.x, nearestPlayer.y);
+      if (targetZone?.id === 'sanctuary') {
+        continue; // Skip boss attacks if target is in sanctuary
+      }
+      
       const template = ENEMY_TYPES[enemy.type];
       const attackCooldown = template?.attackCooldown || 3000;
       
@@ -1704,6 +1792,8 @@ function gameTick() {
         if (attackType === 'spore_burst') {
           // Blossom Behemoth: Shoot homing spores at nearby players
           for (const player of alivePlayers) {
+            const playerZone = getZoneAtPosition(player.x, player.y);
+            if (playerZone?.id === 'sanctuary') continue; // Skip players in sanctuary
             if (distance(enemy, player) < 400) {
               // Create homing spore projectile
               const id = 'spore_' + Math.random().toString(36).substr(2, 9);
@@ -1870,25 +1960,47 @@ function gameTick() {
     }
     // ========== END BOSS ATTACKS ==========
 
-    // Wander if no player nearby (keeps enemies moving)
-    if (!nearestPlayer || nearestDist > 500) {
+    // Wander if no player nearby (keeps enemies moving within zone)
+    if (!nearestPlayer || nearestDist > 400) {
       // Random wander
       if (!enemy.wanderAngle || Math.random() < 0.02) {
         enemy.wanderAngle = Math.random() * Math.PI * 2;
       }
       const wanderSpeed = currentSpeed * 0.3;
-      enemy.x += Math.cos(enemy.wanderAngle) * wanderSpeed * dt;
-      enemy.y += Math.sin(enemy.wanderAngle) * wanderSpeed * dt;
+      let newX = enemy.x + Math.cos(enemy.wanderAngle) * wanderSpeed * dt;
+      let newY = enemy.y + Math.sin(enemy.wanderAngle) * wanderSpeed * dt;
+      
+      // Keep in zone (all enemies, not just bosses)
+      if (enemyZone?.polygon) {
+        if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
+          // Turn around instead of leaving zone
+          enemy.wanderAngle = enemy.wanderAngle + Math.PI + (Math.random() - 0.5);
+          newX = enemy.x;
+          newY = enemy.y;
+        }
+      }
       
       // Keep in bounds
-      enemy.x = clamp(enemy.x, 50, WORLD.width - 50);
-      enemy.y = clamp(enemy.y, 50, WORLD.height - 50);
+      enemy.x = clamp(newX, 50, WORLD.width - 50);
+      enemy.y = clamp(newY, 50, WORLD.height - 50);
+      
+      // Prevent enemies from entering sanctuary during wander
+      if (ZONES.sanctuary?.polygon && pointInPolygon(enemy.x, enemy.y, ZONES.sanctuary.polygon)) {
+        // Push back out of sanctuary
+        const sanctuaryCenter = { x: 3000, y: 2500 };
+        const pushDir = normalize({ x: enemy.x - sanctuaryCenter.x, y: enemy.y - sanctuaryCenter.y });
+        enemy.x += pushDir.x * 50;
+        enemy.y += pushDir.y * 50;
+        enemy.wanderAngle = Math.atan2(pushDir.y, pushDir.x); // Face away from sanctuary
+      }
     }
     
-    if (nearestPlayer) {
-      // Don't enter safe zone
-      const distToSafe = distance(enemy, ZONES.sanctuary);
-      if (distToSafe > ZONES.sanctuary.radius + 50) {
+    if (nearestPlayer && nearestDist <= 400) {
+      // Check if we would enter sanctuary - don't chase into safe zone
+      const sanctuaryPoly = ZONES.sanctuary?.polygon;
+      const playerInSanctuary = sanctuaryPoly && pointInPolygon(nearestPlayer.x, nearestPlayer.y, sanctuaryPoly);
+      
+      if (!playerInSanctuary) {
         const dir = normalize({ 
           x: nearestPlayer.x - enemy.x, 
           y: nearestPlayer.y - enemy.y 
@@ -1898,15 +2010,19 @@ function gameTick() {
         let newX = enemy.x + dir.x * currentSpeed * dt;
         let newY = enemy.y + dir.y * currentSpeed * dt;
         
-        // Zone bosses must stay in their zone (polygon check)
-        if (enemy.isBoss && enemy.zone && ZONES[enemy.zone]?.polygon) {
-          const zone = ZONES[enemy.zone];
-          // Check if new position is inside the zone polygon
-          if (!pointInPolygon(newX, newY, zone.polygon)) {
+        // ALL enemies must stay in their zone (polygon check)
+        if (enemyZone?.polygon) {
+          if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
             // Stay at current position if would leave zone
             newX = enemy.x;
             newY = enemy.y;
           }
+        }
+        
+        // Also prevent entering sanctuary
+        if (sanctuaryPoly && pointInPolygon(newX, newY, sanctuaryPoly)) {
+          newX = enemy.x;
+          newY = enemy.y;
         }
         
         enemy.x = newX;
@@ -1920,9 +2036,13 @@ function gameTick() {
         }
       }
 
-      // Attack player on collision
+      // Attack player on collision (only if in same zone and not in sanctuary)
+      const attackTargetZone = getZoneAtPosition(nearestPlayer.x, nearestPlayer.y);
+      const targetInSanctuary = attackTargetZone?.id === 'sanctuary';
+      const canAttack = !targetInSanctuary && (!enemyZone || !attackTargetZone || attackTargetZone.id === enemyZone.id);
+      
       const collisionDist = enemy.radius + 16; // player radius
-      if (nearestDist < collisionDist && now - enemy.lastAttack > 500) {
+      if (canAttack && nearestDist < collisionDist && now - enemy.lastAttack > 500) {
         // Check if player is invulnerable
         if (!nearestPlayer.invulnerableUntil || nearestPlayer.invulnerableUntil < now) {
           nearestPlayer.health -= enemy.damage;
@@ -2220,6 +2340,20 @@ function gameTick() {
     return now - d.createdAt < d.lifetime;
   });
 
+  // --- CLEANUP DEAD ENEMIES (safety net) ---
+  for (const [id, enemy] of gameState.enemies) {
+    if (enemy.health <= 0) {
+      gameState.enemies.delete(id);
+    }
+  }
+
+  // --- CLEANUP OLD PROJECTILES (safety net) ---
+  for (const [id, proj] of gameState.projectiles) {
+    if (now - proj.createdAt > 10000) { // 10 second max lifetime
+      gameState.projectiles.delete(id);
+    }
+  }
+
   // --- BROADCAST STATE ---
   const stateSnapshot = {
     tick: gameState.tickCount,
@@ -2336,11 +2470,7 @@ function gameTick() {
       isCrit: d.isCrit,
       alpha: 1 - (now - d.createdAt) / d.lifetime,
     })),
-    world: WORLD,
-    zones: ZONES,
-    portals: PORTALS,
-    buildings: BUILDINGS,
-    safeZone: { polygon: ZONES.sanctuary.polygon },
+    // Static data removed - sent once on connect instead
   };
 
   io.emit('gameState', stateSnapshot);
@@ -2784,6 +2914,82 @@ io.on('connection', (socket) => {
         } else {
           socket.emit('skinError', { message: 'Skin not unlocked or invalid' });
         }
+        break;
+      }
+    }
+  });
+
+  // Buy upgrade from shop
+  socket.on('buyUpgrade', ({ type }) => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        const costs = {
+          health: 500,
+          damage: 750,
+          speed: 600,
+          cooldown: 1000,
+        };
+        
+        const cost = costs[type];
+        if (!cost) {
+          socket.emit('shopError', { message: 'Invalid upgrade type' });
+          return;
+        }
+        
+        if (player.totalXp < cost) {
+          socket.emit('shopError', { message: 'Not enough XP' });
+          return;
+        }
+        
+        // Deduct XP
+        player.totalXp -= cost;
+        
+        // Initialize upgrades if not exist
+        player.upgrades = player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 };
+        
+        // Apply upgrade
+        if (type === 'health') {
+          player.upgrades.health += 1;
+          player.maxHealth += 20;
+          player.health = Math.min(player.health + 20, player.maxHealth);
+        } else if (type === 'damage') {
+          player.upgrades.damage += 1;
+          player.damageMultiplier = (player.damageMultiplier || 1) * 1.05;
+        } else if (type === 'speed') {
+          player.upgrades.speed += 1;
+          player.speedMultiplier = (player.speedMultiplier || 1) * 1.05;
+        } else if (type === 'cooldown') {
+          player.upgrades.cooldown += 1;
+          player.cooldownMultiplier = (player.cooldownMultiplier || 1) * 0.95;
+        }
+        
+        socket.emit('upgradePurchased', { 
+          type, 
+          totalXp: player.totalXp,
+          upgrades: player.upgrades,
+        });
+        
+        console.log(`💰 ${player.name} bought ${type} upgrade (cost: ${cost} XP)`);
+        break;
+      }
+    }
+  });
+
+  // Emote
+  socket.on('emote', ({ type }) => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        player.emote = type;
+        player.emoteStart = Date.now();
+        io.emit('playerEmote', { playerId: player.id, type, x: player.x, y: player.y });
+        
+        // Clear emote after duration
+        setTimeout(() => {
+          if (player.emote === type) {
+            player.emote = null;
+            player.emoteStart = null;
+          }
+        }, 3000);
         break;
       }
     }
