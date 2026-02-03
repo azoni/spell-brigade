@@ -922,6 +922,7 @@ function spawnEnemy(forceType = null, position = null, levelBoost = 0, xpMultipl
   const enemy = {
     id,
     type,
+    name: template.name,
     x: pos.x,
     y: pos.y,
     health: Math.floor(template.health * scaleFactor),
@@ -1412,8 +1413,31 @@ function gameTick() {
           x: nearestPlayer.x - enemy.x, 
           y: nearestPlayer.y - enemy.y 
         });
-        enemy.x += dir.x * currentSpeed * dt;
-        enemy.y += dir.y * currentSpeed * dt;
+        
+        // Calculate new position
+        let newX = enemy.x + dir.x * currentSpeed * dt;
+        let newY = enemy.y + dir.y * currentSpeed * dt;
+        
+        // Zone bosses must stay in their zone
+        if (enemy.isBoss && enemy.zone && ZONES[enemy.zone]) {
+          const zone = ZONES[enemy.zone];
+          const distFromCenter = Math.sqrt((newX - zone.x) ** 2 + (newY - zone.y) ** 2);
+          
+          // Check if new position would be outside zone
+          if (zone.innerRadius !== undefined) {
+            if (distFromCenter < zone.innerRadius || distFromCenter > zone.outerRadius) {
+              // Don't move outside zone - maybe move along the boundary instead
+              const currentDist = Math.sqrt((enemy.x - zone.x) ** 2 + (enemy.y - zone.y) ** 2);
+              const targetDist = Math.max(zone.innerRadius + 20, Math.min(zone.outerRadius - 20, currentDist));
+              const angleToCenter = Math.atan2(enemy.y - zone.y, enemy.x - zone.x);
+              newX = zone.x + Math.cos(angleToCenter) * targetDist;
+              newY = zone.y + Math.sin(angleToCenter) * targetDist;
+            }
+          }
+        }
+        
+        enemy.x = newX;
+        enemy.y = newY;
         
         // Update facing
         if (Math.abs(dir.x) > Math.abs(dir.y)) {
@@ -1719,6 +1743,7 @@ function gameTick() {
       .map(e => ({
         id: e.id,
         type: e.behavior === 'ambush' && !e.revealed ? 'xpOrb' : e.type, // Disguise mimics
+        name: e.name,
         x: Math.round(e.x * 10) / 10,
         y: Math.round(e.y * 10) / 10,
         health: Math.round(e.health),
