@@ -345,6 +345,10 @@ const SKINS = {
   arcanist_archmage: { id: 'arcanist_archmage', class: 'arcanist', name: 'Archmage', color: '#7c3aed', requiredXp: 2000 },
   arcanist_celestial: { id: 'arcanist_celestial', class: 'arcanist', name: 'Celestial', color: '#fcd34d', requiredXp: 5000, special: true },
   arcanist_cosmic: { id: 'arcanist_cosmic', class: 'arcanist', name: 'Cosmic Entity', color: '#1e1b4b', requiredXp: 10000, special: true },
+  
+  // Voidlord skins (Admin)
+  voidlord_default: { id: 'voidlord_default', class: 'voidlord', name: 'Void Lord', color: '#1a0a2e', requiredXp: 0 },
+  voidlord_ascended: { id: 'voidlord_ascended', class: 'voidlord', name: 'Ascended', color: '#ff00ff', requiredXp: 0 },
 };
 
 // XP thresholds for titles/ranks
@@ -2535,6 +2539,9 @@ function gameTick() {
         animFrame: p.animFrame || 0,
         selectedSkin: p.selectedSkin || `${p.class}_default`,
         cooldowns,
+        emote: p.emote || null,
+        emoteStart: p.emoteStart || null,
+        isHealing: p.isHealing || false,
       };
     }),
     enemies: [...gameState.enemies.values()]
