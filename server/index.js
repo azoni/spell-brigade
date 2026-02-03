@@ -466,6 +466,82 @@ const ENEMY_TYPES = {
     behavior: 'boss',
     isBoss: true,
   },
+  // ZONE BOSSES - Unique per zone with custom attacks
+  boss_meadow: {
+    id: 'boss_meadow',
+    name: 'Blossom Behemoth',
+    health: 400,
+    damage: 15,
+    speed: 40,
+    radius: 35,
+    xp: 150,
+    color: '#84cc16',
+    behavior: 'boss_meadow',
+    isBoss: true,
+    zone: 'meadow',
+    attackCooldown: 3000,
+    attackType: 'spore_burst', // Spawns homing spores
+  },
+  boss_forest: {
+    id: 'boss_forest',
+    name: 'Ancient Treant',
+    health: 800,
+    damage: 25,
+    speed: 25,
+    radius: 45,
+    xp: 300,
+    color: '#166534',
+    behavior: 'boss_forest',
+    isBoss: true,
+    zone: 'forest',
+    attackCooldown: 4000,
+    attackType: 'root_trap', // Creates damaging root zones
+  },
+  boss_volcanic: {
+    id: 'boss_volcanic',
+    name: 'Magma Titan',
+    health: 1200,
+    damage: 35,
+    speed: 30,
+    radius: 50,
+    xp: 500,
+    color: '#dc2626',
+    behavior: 'boss_volcanic',
+    isBoss: true,
+    zone: 'volcanic',
+    attackCooldown: 5000,
+    attackType: 'meteor_rain', // Calls down meteors around it
+  },
+  boss_frozen: {
+    id: 'boss_frozen',
+    name: 'Frost Wyrm',
+    health: 1500,
+    damage: 40,
+    speed: 45,
+    radius: 48,
+    xp: 700,
+    color: '#0ea5e9',
+    behavior: 'boss_frozen',
+    isBoss: true,
+    zone: 'frozen',
+    attackCooldown: 4000,
+    attackType: 'ice_breath', // Cone attack that freezes
+  },
+  boss_abyss: {
+    id: 'boss_abyss',
+    name: 'Void Overlord',
+    health: 2500,
+    damage: 50,
+    speed: 35,
+    radius: 55,
+    xp: 1500,
+    color: '#581c87',
+    behavior: 'boss_abyss',
+    isBoss: true,
+    zone: 'abyss',
+    attackCooldown: 3500,
+    attackType: 'void_pulse', // AOE that pulls players in then explodes
+  },
 };
 
 // ===========================================
@@ -586,9 +662,22 @@ const gameState = {
   xpOrbs: new Map(),       // XP pickups
   damageNumbers: [],       // Floating damage text
   particles: [],           // Visual effects
+  zoneBosses: new Map(),   // Zone boss tracking (zoneId -> enemyId)
+  bossRespawnTimers: new Map(), // Zone -> respawn timestamp
   lastTick: Date.now(),
   tickCount: 0,
 };
+
+// Zone boss types (which boss for each zone)
+const ZONE_BOSS_TYPES = {
+  meadow: 'boss_meadow',
+  forest: 'boss_forest',
+  volcanic: 'boss_volcanic',
+  frozen: 'boss_frozen',
+  abyss: 'boss_abyss',
+};
+
+const BOSS_RESPAWN_TIME = 5 * 60 * 1000; // 5 minutes
 
 // ===========================================
 // XP ORB CONFIG
@@ -863,6 +952,77 @@ function spawnEnemy(forceType = null, position = null, levelBoost = 0, xpMultipl
   if (template.isBoss) {
     io.emit('bossSpawn', { type, name: template.name, zone: zone?.id });
   }
+  
+  return id; // Return enemy ID for tracking
+}
+
+// Spawn a zone boss
+function spawnZoneBoss(zoneId) {
+  const bossType = ZONE_BOSS_TYPES[zoneId];
+  if (!bossType) return null;
+  
+  const template = ENEMY_TYPES[bossType];
+  if (!template) return null;
+  
+  // Check if boss already exists in this zone
+  if (gameState.zoneBosses.has(zoneId)) {
+    const existingBossId = gameState.zoneBosses.get(zoneId);
+    if (gameState.enemies.has(existingBossId)) {
+      return existingBossId; // Boss still alive
+    }
+  }
+  
+  // Check respawn timer
+  if (gameState.bossRespawnTimers.has(zoneId)) {
+    if (Date.now() < gameState.bossRespawnTimers.get(zoneId)) {
+      return null; // Still on respawn timer
+    }
+    gameState.bossRespawnTimers.delete(zoneId);
+  }
+  
+  // Get spawn position in the zone
+  const zone = ZONES[zoneId];
+  if (!zone || zone.isSafe) return null;
+  
+  const angle = Math.random() * Math.PI * 2;
+  const dist = zone.innerRadius + (zone.outerRadius - zone.innerRadius) * 0.5;
+  const pos = {
+    x: zone.x + Math.cos(angle) * dist,
+    y: zone.y + Math.sin(angle) * dist,
+  };
+  
+  // Spawn the boss
+  const bossId = spawnEnemy(bossType, pos, 0, 1);
+  if (bossId) {
+    gameState.zoneBosses.set(zoneId, bossId);
+    console.log(`👑 Zone boss spawned: ${template.name} in ${zone.name}`);
+  }
+  
+  return bossId;
+}
+
+// Handle boss death - set respawn timer
+function onBossDeath(enemy) {
+  const zoneId = enemy.zone;
+  if (zoneId && ZONE_BOSS_TYPES[zoneId]) {
+    gameState.zoneBosses.delete(zoneId);
+    gameState.bossRespawnTimers.set(zoneId, Date.now() + BOSS_RESPAWN_TIME);
+    console.log(`💀 Zone boss defeated: ${enemy.name} in ${zoneId} - respawns in 5 minutes`);
+    
+    // Announce to all players
+    io.emit('bossDefeated', { 
+      name: enemy.name, 
+      zone: zoneId,
+      respawnIn: BOSS_RESPAWN_TIME 
+    });
+  }
+}
+
+// Initialize zone bosses on startup
+function initZoneBosses() {
+  for (const zoneId of Object.keys(ZONE_BOSS_TYPES)) {
+    spawnZoneBoss(zoneId);
+  }
 }
 
 // ===========================================
@@ -1065,6 +1225,185 @@ function gameTick() {
       }
     }
 
+    // ========== ZONE BOSS ATTACKS ==========
+    if (enemy.isBoss && nearestPlayer) {
+      const template = ENEMY_TYPES[enemy.type];
+      const attackCooldown = template?.attackCooldown || 3000;
+      
+      if (now - (enemy.lastAbility || 0) > attackCooldown) {
+        enemy.lastAbility = now;
+        
+        const attackType = template?.attackType;
+        
+        if (attackType === 'spore_burst') {
+          // Blossom Behemoth: Shoot homing spores at nearby players
+          for (const player of alivePlayers) {
+            if (distance(enemy, player) < 400) {
+              // Create homing spore projectile
+              const id = 'spore_' + Math.random().toString(36).substr(2, 9);
+              gameState.projectiles.set(id, {
+                id,
+                x: enemy.x,
+                y: enemy.y,
+                targetId: player.id,
+                speed: 120,
+                damage: 15,
+                radius: 10,
+                color: '#84cc16',
+                fromEnemy: true,
+                lifetime: 5000,
+                createdAt: now,
+              });
+            }
+          }
+          io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+          spawnParticles(enemy.x, enemy.y, '#84cc16', 12);
+        }
+        
+        else if (attackType === 'root_trap') {
+          // Ancient Treant: Create damaging root zones
+          for (let i = 0; i < 3; i++) {
+            const angle = (Math.PI * 2 / 3) * i + Math.random() * 0.5;
+            const dist = 100 + Math.random() * 100;
+            const rx = enemy.x + Math.cos(angle) * dist;
+            const ry = enemy.y + Math.sin(angle) * dist;
+            
+            // Root trap as a "hazard projectile"
+            const id = 'root_' + Math.random().toString(36).substr(2, 9);
+            gameState.projectiles.set(id, {
+              id,
+              x: rx,
+              y: ry,
+              speed: 0,
+              damage: 20,
+              radius: 50,
+              color: '#166534',
+              fromEnemy: true,
+              isHazard: true,
+              lifetime: 3000,
+              createdAt: now,
+              pulseRate: 500,
+            });
+            io.emit('explosion', { x: rx, y: ry, radius: 50, color: '#166534' });
+          }
+          io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+        }
+        
+        else if (attackType === 'meteor_rain') {
+          // Magma Titan: Call down meteors
+          for (let i = 0; i < 5; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 50 + Math.random() * 200;
+            const mx = enemy.x + Math.cos(angle) * dist;
+            const my = enemy.y + Math.sin(angle) * dist;
+            
+            io.emit('meteorWarning', { x: mx, y: my, radius: 60, delay: 1500 });
+            
+            setTimeout(() => {
+              // Deal damage in area
+              for (const player of gameState.players.values()) {
+                if (player.health <= 0) continue;
+                if (distance({ x: mx, y: my }, player) < 60) {
+                  player.health -= 40;
+                  io.to(player.socketId).emit('damaged', { amount: 40, fromX: mx, fromY: my });
+                  if (player.health <= 0) {
+                    player.health = 0;
+                    player.deaths = (player.deaths || 0) + 1;
+                    io.to(player.socketId).emit('died', { killedBy: 'Meteor', level: player.level, xp: player.xp });
+                    savePlayerToDb(player);
+                  }
+                }
+              }
+              io.emit('explosion', { x: mx, y: my, radius: 60, color: '#f97316' });
+            }, 1500);
+          }
+          io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+        }
+        
+        else if (attackType === 'ice_breath') {
+          // Frost Wyrm: Cone attack that freezes and damages
+          const dir = nearestPlayer ? normalize({ 
+            x: nearestPlayer.x - enemy.x, 
+            y: nearestPlayer.y - enemy.y 
+          }) : { x: 1, y: 0 };
+          
+          const coneAngle = Math.PI / 3; // 60 degree cone
+          const coneRange = 250;
+          const baseAngle = Math.atan2(dir.y, dir.x);
+          
+          for (const player of alivePlayers) {
+            const toPlayer = { x: player.x - enemy.x, y: player.y - enemy.y };
+            const playerDist = Math.sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+            
+            if (playerDist < coneRange) {
+              const playerAngle = Math.atan2(toPlayer.y, toPlayer.x);
+              let angleDiff = Math.abs(playerAngle - baseAngle);
+              if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+              
+              if (angleDiff < coneAngle / 2) {
+                player.health -= 35;
+                player.frozenUntil = now + 2000;
+                io.to(player.socketId).emit('damaged', { amount: 35, fromX: enemy.x, fromY: enemy.y });
+                if (player.health <= 0) {
+                  player.health = 0;
+                  player.deaths = (player.deaths || 0) + 1;
+                  io.to(player.socketId).emit('died', { killedBy: 'Frost Wyrm', level: player.level, xp: player.xp });
+                  savePlayerToDb(player);
+                }
+              }
+            }
+          }
+          io.emit('iceNova', { x: enemy.x, y: enemy.y, radius: coneRange });
+          io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+        }
+        
+        else if (attackType === 'void_pulse') {
+          // Void Overlord: Pull players in, then explode
+          const pullRadius = 300;
+          const explodeRadius = 150;
+          
+          // Warning
+          io.emit('meteorWarning', { x: enemy.x, y: enemy.y, radius: explodeRadius, delay: 2000 });
+          
+          // Pull effect
+          const pullInterval = setInterval(() => {
+            for (const player of gameState.players.values()) {
+              if (player.health <= 0) continue;
+              const dist = distance(enemy, player);
+              if (dist < pullRadius && dist > 30) {
+                const pullDir = normalize({ x: enemy.x - player.x, y: enemy.y - player.y });
+                player.x += pullDir.x * 3;
+                player.y += pullDir.y * 3;
+              }
+            }
+          }, 50);
+          
+          // Explode after delay
+          setTimeout(() => {
+            clearInterval(pullInterval);
+            for (const player of gameState.players.values()) {
+              if (player.health <= 0) continue;
+              if (distance(enemy, player) < explodeRadius) {
+                player.health -= 60;
+                io.to(player.socketId).emit('damaged', { amount: 60, fromX: enemy.x, fromY: enemy.y });
+                if (player.health <= 0) {
+                  player.health = 0;
+                  player.deaths = (player.deaths || 0) + 1;
+                  io.to(player.socketId).emit('died', { killedBy: 'Void Overlord', level: player.level, xp: player.xp });
+                  savePlayerToDb(player);
+                }
+              }
+            }
+            io.emit('explosion', { x: enemy.x, y: enemy.y, radius: explodeRadius, color: '#7c3aed' });
+          }, 2000);
+          
+          io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+          spawnParticles(enemy.x, enemy.y, '#7c3aed', 15);
+        }
+      }
+    }
+    // ========== END BOSS ATTACKS ==========
+
     if (nearestPlayer) {
       // Don't enter safe zone
       const distToSafe = distance(enemy, ZONES.sanctuary);
@@ -1228,6 +1567,12 @@ function gameTick() {
     if (enemiesInZone < 3 && Math.random() < 0.02) {
       spawnEnemyInZone(zoneId);
     }
+  }
+
+  // --- CHECK ZONE BOSS RESPAWNS ---
+  for (const zoneId of Object.keys(ZONE_BOSS_TYPES)) {
+    // Try to spawn boss (function handles cooldown check)
+    spawnZoneBoss(zoneId);
   }
 
   // --- UPDATE XP ORBS ---
@@ -1473,12 +1818,21 @@ function checkEnemyDeath(enemy, killerId) {
     // Sound event
     io.emit('sound', { type: 'enemyDeath', x: enemy.x, y: enemy.y, isBoss: enemy.isBoss });
     
+    // Zone boss death - set respawn timer
+    if (enemy.isBoss && enemy.zone) {
+      onBossDeath(enemy);
+    }
+    
     gameState.enemies.delete(enemy.id);
   }
 }
 
 // Start game loop
 setInterval(gameTick, TICK_INTERVAL);
+
+// Initialize zone bosses
+initZoneBosses();
+console.log('👑 Zone bosses initialized');
 
 // ===========================================
 // SOCKET.IO EVENTS
