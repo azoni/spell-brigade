@@ -1036,6 +1036,8 @@ function createProjectile(player, spell, targetX, targetY) {
   const proj = {
     id,
     ownerId: player.id,
+    ownerClass: player.class,
+    ownerLevel: player.level || 1,
     spellId: spell.id,
     x: player.x,
     y: player.y,
@@ -1762,6 +1764,9 @@ function gameTick() {
       radius: p.radius,
       color: p.color,
       trailColor: p.trailColor,
+      spellId: p.spellId,
+      ownerClass: p.ownerClass,
+      level: p.ownerLevel || 1,
     })),
     xpOrbs: [...gameState.xpOrbs.values()].map(o => ({
       id: o.id,
