@@ -437,6 +437,38 @@ const CLASSES = {
       duration: 2000,
     },
   },
+  
+  // === ADMIN CLASS - Secret ===
+  voidlord: {
+    id: 'voidlord',
+    name: 'Void Lord',
+    color: '#1a0a2e',
+    secondaryColor: '#ff00ff',
+    baseHealth: 200,
+    baseSpeed: 200,
+    spells: ['voidBolt', 'annihilate'],
+    description: 'Master of the void. Unmatched power.',
+    isAdmin: true,
+    canPvP: true, // Can damage other players
+    dashAbility: {
+      id: 'voidShift',
+      name: 'Void Shift',
+      cooldown: 2000,
+      distance: 350,
+      invulnerable: true,
+      damageOnArrival: 40,
+      damageRadius: 80,
+    },
+    ultimateAbility: {
+      id: 'voidRift',
+      name: 'Void Rift',
+      cooldown: 10000,
+      damage: 200,
+      radius: 300,
+      pullForce: 150, // Pulls enemies toward center
+      duration: 3000,
+    },
+  },
 };
 
 // ===========================================
@@ -513,6 +545,33 @@ const SPELLS = {
     color: '#e056fd',
     trailColor: '#d63384',
     homing: true,
+  },
+  
+  // === VOIDLORD SPELLS ===
+  voidBolt: {
+    id: 'voidBolt',
+    name: 'Void Bolt',
+    damage: 60,
+    cooldown: 300,
+    range: 500,
+    speed: 800,
+    radius: 15,
+    color: '#1a0a2e',
+    trailColor: '#ff00ff',
+    piercing: true, // Goes through enemies
+    canHitPlayers: true, // PvP enabled
+  },
+  annihilate: {
+    id: 'annihilate',
+    name: 'Annihilate',
+    damage: 100,
+    cooldown: 1500,
+    range: 400,
+    speed: 0, // AOE
+    radius: 200,
+    color: '#ff00ff',
+    isAoe: true,
+    canHitPlayers: true,
   },
 };
 
@@ -906,6 +965,7 @@ const gameState = {
   xpOrbs: new Map(),       // XP pickups
   damageNumbers: [],       // Floating damage text
   particles: [],           // Visual effects
+  chatMessages: [],        // Chat history (last 50 messages)
   zoneBosses: new Map(),   // Zone boss tracking (zoneId -> enemyId)
   bossRespawnTimers: new Map(), // Zone -> respawn timestamp
   lastTick: Date.now(),
@@ -1546,6 +1606,8 @@ function createProjectile(player, spell, targetX, targetY) {
     slowDuration: spell.slowDuration,
     targetId: null,
     createdAt: Date.now(),
+    canHitPlayers: spell.canHitPlayers || false,
+    piercing: spell.piercing || false,
   };
   
   // For homing missiles, track the target
@@ -2101,6 +2163,31 @@ function gameTick() {
           checkEnemyDeath(enemy, proj.ownerId);
         }
       }
+      
+      // PvP damage for admin spells
+      if (proj.canHitPlayers) {
+        for (const target of gameState.players.values()) {
+          if (target.id === proj.ownerId) continue; // Don't hit self
+          if (target.health <= 0) continue;
+          if (distance(proj, target) < proj.radius + 20) {
+            target.health -= proj.damage;
+            spawnDamageNumber(target.x, target.y - 20, proj.damage, true);
+            
+            // Notify target
+            const targetSocket = [...io.sockets.sockets.values()].find(s => s.id === target.socketId);
+            if (targetSocket) {
+              targetSocket.emit('damaged', { amount: proj.damage, by: 'Void Lord' });
+            }
+            
+            // Check death
+            if (target.health <= 0) {
+              target.deaths = (target.deaths || 0) + 1;
+              targetSocket?.emit('died', { killedBy: 'Void Lord', level: target.level });
+            }
+          }
+        }
+      }
+      
       gameState.projectiles.delete(proj.id);
       continue;
     }
@@ -2218,6 +2305,34 @@ function gameTick() {
         
         hit = true;
         break;
+      }
+    }
+    
+    // PvP damage for admin projectiles (if piercing, check all players)
+    if (proj.canHitPlayers && !hit) {
+      for (const target of gameState.players.values()) {
+        if (target.id === proj.ownerId) continue;
+        if (target.health <= 0) continue;
+        if (distance(proj, target) < proj.radius + 20) {
+          target.health -= proj.damage;
+          spawnDamageNumber(target.x, target.y - 20, proj.damage, true);
+          spawnParticles(target.x, target.y, proj.color, 6);
+          
+          const targetSocket = [...io.sockets.sockets.values()].find(s => s.id === target.socketId);
+          if (targetSocket) {
+            targetSocket.emit('damaged', { amount: proj.damage, by: 'Void Lord' });
+          }
+          
+          if (target.health <= 0) {
+            target.deaths = (target.deaths || 0) + 1;
+            targetSocket?.emit('died', { killedBy: 'Void Lord', level: target.level });
+          }
+          
+          if (!proj.piercing) {
+            hit = true;
+            break;
+          }
+        }
       }
     }
 
@@ -2553,7 +2668,7 @@ io.on('connection', (socket) => {
   // Send available classes
   socket.emit('classes', CLASSES);
 
-  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin }) => {
+  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey }) => {
     // Prevent double-join from same socket
     for (const p of gameState.players.values()) {
       if (p.socketId === socket.id) {
@@ -2562,8 +2677,18 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Validate class
-    const classData = CLASSES[playerClass] || CLASSES.pyromancer;
+    // Validate class - voidlord requires admin key
+    let validatedClass = playerClass;
+    if (playerClass === 'voidlord') {
+      const correctKey = process.env.ADMIN_KEY || 'azoni-voidlord-2026';
+      if (adminKey !== correctKey) {
+        validatedClass = 'pyromancer'; // Default if wrong key
+        console.log(`⚠️ Invalid admin key attempt from ${playerName}`);
+      } else {
+        console.log(`👑 Admin ${playerName} authenticated as Void Lord`);
+      }
+    }
+    const classData = CLASSES[validatedClass] || CLASSES.pyromancer;
     
     // Load or create player
     let saved = playerId ? await loadPlayerFromDb(playerId) : null;
@@ -2654,6 +2779,20 @@ io.on('connection', (socket) => {
     });
 
     console.log(`🧙 Player joined: ${player.name} (${player.class}) - Level ${player.level} - Skin: ${skin}`);
+    
+    // Broadcast join message to all players
+    const joinMsg = {
+      id: uuidv4(),
+      type: 'system',
+      text: `${player.name} has joined the game`,
+      timestamp: Date.now(),
+    };
+    gameState.chatMessages.push(joinMsg);
+    if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
+    io.emit('chatMessage', joinMsg);
+    
+    // Send chat history to new player
+    socket.emit('chatHistory', gameState.chatMessages);
   });
 
   socket.on('input', (input) => {
@@ -2668,6 +2807,38 @@ io.on('connection', (socket) => {
         break;
       }
     }
+  });
+
+  // Chat message
+  socket.on('chat', (text) => {
+    // Find player
+    let player = null;
+    for (const p of gameState.players.values()) {
+      if (p.socketId === socket.id) {
+        player = p;
+        break;
+      }
+    }
+    if (!player) return;
+    
+    // Sanitize and limit message
+    const sanitized = String(text).slice(0, 200).trim();
+    if (!sanitized) return;
+    
+    const msg = {
+      id: uuidv4(),
+      type: 'player',
+      playerId: player.id,
+      playerName: player.name,
+      playerClass: player.class,
+      text: sanitized,
+      timestamp: Date.now(),
+    };
+    
+    gameState.chatMessages.push(msg);
+    if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
+    
+    io.emit('chatMessage', msg);
   });
 
   // Dash ability (spacebar)
@@ -3027,6 +3198,17 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
+        // Broadcast leave message
+        const leaveMsg = {
+          id: uuidv4(),
+          type: 'system',
+          text: `${player.name} has left the game`,
+          timestamp: Date.now(),
+        };
+        gameState.chatMessages.push(leaveMsg);
+        if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
+        io.emit('chatMessage', leaveMsg);
+        
         savePlayerToDb(player); // Fire and forget - async save to Firebase
         gameState.players.delete(player.id);
         console.log(`👋 Player disconnected: ${player.name} (saved)`);
