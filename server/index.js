@@ -65,6 +65,10 @@ const ZONES = {
     enemyLevel: 0,
     enemyTypes: [],
     recommendedLevel: 0,
+    // Center point and radius for backward compatibility
+    x: 3000,
+    y: 2500,
+    radius: 250,
     polygon: [
       { x: 2800, y: 2300 },
       { x: 3200, y: 2300 },
@@ -1223,12 +1227,9 @@ function spawnZoneBoss(zoneId) {
   const zone = ZONES[zoneId];
   if (!zone || zone.isSafe) return null;
   
-  const angle = Math.random() * Math.PI * 2;
-  const dist = zone.innerRadius + (zone.outerRadius - zone.innerRadius) * 0.5;
-  const pos = {
-    x: zone.x + Math.cos(angle) * dist,
-    y: zone.y + Math.sin(angle) * dist,
-  };
+  // Use polygon-based spawn position
+  const pos = getRandomPointInZone(zoneId);
+  if (!pos) return null;
   
   // Spawn the boss
   const bossId = spawnEnemy(bossType, pos, 0, 1);
@@ -1869,6 +1870,21 @@ function gameTick() {
     }
     // ========== END BOSS ATTACKS ==========
 
+    // Wander if no player nearby (keeps enemies moving)
+    if (!nearestPlayer || nearestDist > 500) {
+      // Random wander
+      if (!enemy.wanderAngle || Math.random() < 0.02) {
+        enemy.wanderAngle = Math.random() * Math.PI * 2;
+      }
+      const wanderSpeed = currentSpeed * 0.3;
+      enemy.x += Math.cos(enemy.wanderAngle) * wanderSpeed * dt;
+      enemy.y += Math.sin(enemy.wanderAngle) * wanderSpeed * dt;
+      
+      // Keep in bounds
+      enemy.x = clamp(enemy.x, 50, WORLD.width - 50);
+      enemy.y = clamp(enemy.y, 50, WORLD.height - 50);
+    }
+    
     if (nearestPlayer) {
       // Don't enter safe zone
       const distToSafe = distance(enemy, ZONES.sanctuary);
@@ -1882,21 +1898,14 @@ function gameTick() {
         let newX = enemy.x + dir.x * currentSpeed * dt;
         let newY = enemy.y + dir.y * currentSpeed * dt;
         
-        // Zone bosses must stay in their zone
-        if (enemy.isBoss && enemy.zone && ZONES[enemy.zone]) {
+        // Zone bosses must stay in their zone (polygon check)
+        if (enemy.isBoss && enemy.zone && ZONES[enemy.zone]?.polygon) {
           const zone = ZONES[enemy.zone];
-          const distFromCenter = Math.sqrt((newX - zone.x) ** 2 + (newY - zone.y) ** 2);
-          
-          // Check if new position would be outside zone
-          if (zone.innerRadius !== undefined) {
-            if (distFromCenter < zone.innerRadius || distFromCenter > zone.outerRadius) {
-              // Don't move outside zone - maybe move along the boundary instead
-              const currentDist = Math.sqrt((enemy.x - zone.x) ** 2 + (enemy.y - zone.y) ** 2);
-              const targetDist = Math.max(zone.innerRadius + 20, Math.min(zone.outerRadius - 20, currentDist));
-              const angleToCenter = Math.atan2(enemy.y - zone.y, enemy.x - zone.x);
-              newX = zone.x + Math.cos(angleToCenter) * targetDist;
-              newY = zone.y + Math.sin(angleToCenter) * targetDist;
-            }
+          // Check if new position is inside the zone polygon
+          if (!pointInPolygon(newX, newY, zone.polygon)) {
+            // Stay at current position if would leave zone
+            newX = enemy.x;
+            newY = enemy.y;
           }
         }
         
