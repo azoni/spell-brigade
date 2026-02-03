@@ -34,97 +34,285 @@ if (FIREBASE_ENABLED) {
 }
 
 // ===========================================
-// WORLD & ZONES
+// WORLD & ZONES - Polygon-based World Map
 // ===========================================
 const WORLD = {
-  width: 5000,
+  width: 6000,
   height: 5000,
 };
 
-// Zones - each has different difficulty and enemy types
+// Helper: Check if point is inside polygon
+function pointInPolygon(x, y, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// Zones with polygon boundaries
 const ZONES = {
   sanctuary: {
     id: 'sanctuary',
     name: 'Sanctuary',
     description: 'Safe starting area. Heal and prepare here.',
-    x: 2500,
-    y: 2500,
-    radius: 300,
     color: '#22c55e',
     isSafe: true,
     enemyLevel: 0,
     enemyTypes: [],
+    recommendedLevel: 0,
+    polygon: [
+      { x: 2800, y: 2300 },
+      { x: 3200, y: 2300 },
+      { x: 3400, y: 2500 },
+      { x: 3200, y: 2700 },
+      { x: 2800, y: 2700 },
+      { x: 2600, y: 2500 },
+    ],
   },
   meadow: {
     id: 'meadow',
     name: 'Peaceful Meadow',
     description: 'Easy enemies. Good for beginners.',
-    x: 2500,
-    y: 2500,
-    innerRadius: 300,
-    outerRadius: 900,
     color: '#84cc16',
     enemyLevel: 1,
     enemyTypes: ['slime', 'bat'],
     xpMultiplier: 1.0,
     recommendedLevel: 1,
+    polygon: [
+      { x: 2200, y: 1800 },
+      { x: 3800, y: 1800 },
+      { x: 4200, y: 2200 },
+      { x: 4000, y: 3000 },
+      { x: 3500, y: 3200 },
+      { x: 2500, y: 3200 },
+      { x: 2000, y: 3000 },
+      { x: 1800, y: 2200 },
+    ],
+    excludeZones: ['sanctuary'],
   },
   forest: {
     id: 'forest',
     name: 'Dark Forest',
     description: 'Moderate challenge. Spiders and skeletons lurk.',
-    x: 2500,
-    y: 2500,
-    innerRadius: 900,
-    outerRadius: 1600,
     color: '#166534',
     enemyLevel: 2,
     enemyTypes: ['skeleton', 'spider', 'ghost', 'necromancer'],
     xpMultiplier: 1.5,
     recommendedLevel: 5,
+    polygon: [
+      { x: 500, y: 1000 },
+      { x: 2000, y: 800 },
+      { x: 2200, y: 1800 },
+      { x: 1800, y: 2200 },
+      { x: 1500, y: 3000 },
+      { x: 800, y: 3200 },
+      { x: 300, y: 2500 },
+      { x: 200, y: 1500 },
+    ],
   },
   volcanic: {
     id: 'volcanic',
     name: 'Volcanic Wastes',
     description: 'Fire elementals and golems. High risk, high reward.',
-    x: 2500,
-    y: 2500,
-    innerRadius: 1600,
-    outerRadius: 2100,
     color: '#dc2626',
     enemyLevel: 3,
     enemyTypes: ['golem', 'fireElemental', 'necromancer'],
     xpMultiplier: 2.0,
     recommendedLevel: 10,
+    polygon: [
+      { x: 4000, y: 800 },
+      { x: 5500, y: 1000 },
+      { x: 5800, y: 2000 },
+      { x: 5500, y: 3000 },
+      { x: 4500, y: 3200 },
+      { x: 4000, y: 3000 },
+      { x: 4200, y: 2200 },
+      { x: 3800, y: 1800 },
+    ],
   },
   frozen: {
     id: 'frozen',
     name: 'Frozen Expanse',
     description: 'Ice elementals slow you down. Stay alert.',
-    x: 2500,
-    y: 2500,
-    innerRadius: 2100,
-    outerRadius: 2600,
     color: '#0ea5e9',
     enemyLevel: 4,
     enemyTypes: ['iceElemental', 'ghost', 'skeleton'],
     xpMultiplier: 2.5,
     recommendedLevel: 15,
+    polygon: [
+      { x: 1000, y: 3500 },
+      { x: 2500, y: 3200 },
+      { x: 3500, y: 3200 },
+      { x: 4000, y: 3500 },
+      { x: 3800, y: 4500 },
+      { x: 3000, y: 4800 },
+      { x: 2000, y: 4800 },
+      { x: 1200, y: 4500 },
+    ],
   },
   abyss: {
     id: 'abyss',
     name: 'The Abyss',
     description: 'Only the strongest survive. Bosses spawn here.',
-    x: 2500,
-    y: 2500,
-    innerRadius: 2600,
-    outerRadius: 3500,
     color: '#581c87',
     enemyLevel: 5,
     enemyTypes: ['golem', 'necromancer', 'fireElemental', 'iceElemental'],
     xpMultiplier: 3.0,
     recommendedLevel: 20,
     bossChance: 0.02,
+    polygon: [
+      { x: 200, y: 200 },
+      { x: 1200, y: 100 },
+      { x: 600, y: 1000 },
+      { x: 200, y: 1500 },
+      { x: 100, y: 800 },
+    ],
+  },
+  crystal_caves: {
+    id: 'crystal_caves',
+    name: 'Crystal Caves',
+    description: 'Glittering crystals and dangerous golems.',
+    color: '#ec4899',
+    enemyLevel: 3,
+    enemyTypes: ['golem', 'ghost', 'spider'],
+    xpMultiplier: 1.8,
+    recommendedLevel: 8,
+    polygon: [
+      { x: 4500, y: 3500 },
+      { x: 5500, y: 3200 },
+      { x: 5800, y: 4000 },
+      { x: 5500, y: 4800 },
+      { x: 4800, y: 4500 },
+      { x: 4300, y: 4000 },
+    ],
+  },
+};
+
+// Portal definitions
+const PORTALS = {
+  sanctuary_to_meadow: {
+    id: 'sanctuary_to_meadow',
+    name: 'Meadow Path',
+    from: { x: 3000, y: 2350 },
+    to: { x: 3000, y: 2100 },
+    fromZone: 'sanctuary',
+    toZone: 'meadow',
+    color: '#84cc16',
+    requiredLevel: 0,
+  },
+  meadow_to_forest: {
+    id: 'meadow_to_forest',
+    name: 'Forest Gateway',
+    from: { x: 1900, y: 2000 },
+    to: { x: 1700, y: 2000 },
+    fromZone: 'meadow',
+    toZone: 'forest',
+    color: '#166534',
+    requiredLevel: 3,
+  },
+  meadow_to_volcanic: {
+    id: 'meadow_to_volcanic',
+    name: 'Flame Portal',
+    from: { x: 4100, y: 2000 },
+    to: { x: 4300, y: 2000 },
+    fromZone: 'meadow',
+    toZone: 'volcanic',
+    color: '#dc2626',
+    requiredLevel: 8,
+  },
+  meadow_to_frozen: {
+    id: 'meadow_to_frozen',
+    name: 'Frozen Gate',
+    from: { x: 3000, y: 3100 },
+    to: { x: 3000, y: 3400 },
+    fromZone: 'meadow',
+    toZone: 'frozen',
+    color: '#0ea5e9',
+    requiredLevel: 12,
+  },
+  forest_to_abyss: {
+    id: 'forest_to_abyss',
+    name: 'Void Rift',
+    from: { x: 600, y: 1200 },
+    to: { x: 400, y: 800 },
+    fromZone: 'forest',
+    toZone: 'abyss',
+    color: '#581c87',
+    requiredLevel: 18,
+  },
+  volcanic_to_crystal: {
+    id: 'volcanic_to_crystal',
+    name: 'Crystal Passage',
+    from: { x: 5000, y: 3100 },
+    to: { x: 5000, y: 3400 },
+    fromZone: 'volcanic',
+    toZone: 'crystal_caves',
+    color: '#ec4899',
+    requiredLevel: 6,
+  },
+};
+
+// Buildings/Structures
+const BUILDINGS = {
+  wizard_tower: {
+    id: 'wizard_tower',
+    name: "Archmage's Tower",
+    x: 3000, y: 2500,
+    width: 80, height: 120,
+    zone: 'sanctuary',
+    color: '#ffd93d',
+    interactable: true,
+    services: ['respawn', 'heal'],
+  },
+  forest_ruins: {
+    id: 'forest_ruins',
+    name: 'Ancient Ruins',
+    x: 1200, y: 2000,
+    width: 150, height: 100,
+    zone: 'forest',
+    color: '#78716c',
+    interactable: true,
+  },
+  volcano_fortress: {
+    id: 'volcano_fortress',
+    name: 'Obsidian Fortress',
+    x: 5200, y: 2000,
+    width: 180, height: 140,
+    zone: 'volcanic',
+    color: '#7f1d1d',
+    interactable: true,
+  },
+  ice_citadel: {
+    id: 'ice_citadel',
+    name: 'Ice Citadel',
+    x: 2500, y: 4200,
+    width: 160, height: 130,
+    zone: 'frozen',
+    color: '#0284c7',
+    interactable: true,
+  },
+  void_shrine: {
+    id: 'void_shrine',
+    name: 'Void Shrine',
+    x: 400, y: 600,
+    width: 100, height: 100,
+    zone: 'abyss',
+    color: '#581c87',
+    interactable: true,
+  },
+  crystal_sanctum: {
+    id: 'crystal_sanctum',
+    name: 'Crystal Sanctum',
+    x: 5200, y: 4000,
+    width: 120, height: 110,
+    zone: 'crystal_caves',
+    color: '#ec4899',
+    interactable: true,
   },
 };
 
@@ -542,6 +730,21 @@ const ENEMY_TYPES = {
     attackCooldown: 3500,
     attackType: 'void_pulse', // AOE that pulls players in then explodes
   },
+  boss_crystal: {
+    id: 'boss_crystal',
+    name: 'Crystal Golem',
+    health: 600,
+    damage: 20,
+    speed: 30,
+    radius: 40,
+    xp: 250,
+    color: '#ec4899',
+    behavior: 'boss_crystal',
+    isBoss: true,
+    zone: 'crystal_caves',
+    attackCooldown: 3500,
+    attackType: 'crystal_barrage', // Shoots crystal shards
+  },
 };
 
 // ===========================================
@@ -633,23 +836,59 @@ function getPlayerRank(totalXp) {
 
 // Get zone at position
 function getZoneAtPosition(x, y) {
-  const distFromCenter = Math.sqrt((x - 2500) ** 2 + (y - 2500) ** 2);
+  // Check zones in priority order (smaller/special zones first)
+  const priorityOrder = ['sanctuary', 'abyss', 'crystal_caves', 'forest', 'volcanic', 'frozen', 'meadow'];
   
-  // Check sanctuary first
-  if (distFromCenter <= ZONES.sanctuary.radius) {
-    return ZONES.sanctuary;
-  }
-  
-  // Check other zones by distance
-  const zoneOrder = ['meadow', 'forest', 'volcanic', 'frozen', 'abyss'];
-  for (const zoneId of zoneOrder) {
+  for (const zoneId of priorityOrder) {
     const zone = ZONES[zoneId];
-    if (zone.innerRadius !== undefined && distFromCenter > zone.innerRadius && distFromCenter <= zone.outerRadius) {
+    if (zone.polygon && pointInPolygon(x, y, zone.polygon)) {
+      // Check if we should exclude this zone (e.g., sanctuary is inside meadow)
+      if (zone.excludeZones) {
+        let inExcluded = false;
+        for (const excludeId of zone.excludeZones) {
+          const excludeZone = ZONES[excludeId];
+          if (excludeZone.polygon && pointInPolygon(x, y, excludeZone.polygon)) {
+            inExcluded = true;
+            break;
+          }
+        }
+        if (inExcluded) continue;
+      }
       return zone;
     }
   }
   
-  return ZONES.abyss;
+  // Default to meadow for areas outside all defined zones
+  return ZONES.meadow;
+}
+
+// Get random point inside a zone polygon
+function getRandomPointInZone(zoneId) {
+  const zone = ZONES[zoneId];
+  if (!zone || !zone.polygon) return { x: 3000, y: 2500 };
+  
+  // Get bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of zone.polygon) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  
+  // Try to find a point inside polygon
+  for (let i = 0; i < 50; i++) {
+    const x = minX + Math.random() * (maxX - minX);
+    const y = minY + Math.random() * (maxY - minY);
+    if (pointInPolygon(x, y, zone.polygon)) {
+      return { x, y };
+    }
+  }
+  
+  // Fallback to polygon center
+  const centerX = zone.polygon.reduce((sum, p) => sum + p.x, 0) / zone.polygon.length;
+  const centerY = zone.polygon.reduce((sum, p) => sum + p.y, 0) / zone.polygon.length;
+  return { x: centerX, y: centerY };
 }
 
 // ===========================================
@@ -675,6 +914,7 @@ const ZONE_BOSS_TYPES = {
   volcanic: 'boss_volcanic',
   frozen: 'boss_frozen',
   abyss: 'boss_abyss',
+  crystal_caves: 'boss_crystal',
 };
 
 const BOSS_RESPAWN_TIME = 30 * 1000; // 30 seconds
@@ -835,30 +1075,28 @@ function spawnParticles(x, y, color, count = 5) {
 function getSpawnPosition(forZone = null) {
   if (forZone && ZONES[forZone]) {
     const zone = ZONES[forZone];
-    if (zone.innerRadius !== undefined) {
-      // Spawn within the zone ring
-      const angle = Math.random() * Math.PI * 2;
-      const dist = zone.innerRadius + Math.random() * (zone.outerRadius - zone.innerRadius);
+    if (zone.polygon) {
+      // Spawn within the polygon zone
+      const point = getRandomPointInZone(forZone);
       return {
-        x: zone.x + Math.cos(angle) * dist,
-        y: zone.y + Math.sin(angle) * dist,
+        x: point.x,
+        y: point.y,
         zone: forZone,
       };
     }
   }
   
-  // Default: spawn at world edges
-  const edge = Math.floor(Math.random() * 4);
-  let x, y;
-  
-  switch (edge) {
-    case 0: x = Math.random() * WORLD.width; y = -30; break;
-    case 1: x = WORLD.width + 30; y = Math.random() * WORLD.height; break;
-    case 2: x = Math.random() * WORLD.width; y = WORLD.height + 30; break;
-    case 3: x = -30; y = Math.random() * WORLD.height; break;
+  // Default: spawn in random non-safe zone
+  const spawnableZones = Object.keys(ZONES).filter(z => !ZONES[z].isSafe && ZONES[z].polygon);
+  if (spawnableZones.length > 0) {
+    const randomZone = spawnableZones[Math.floor(Math.random() * spawnableZones.length)];
+    const point = getRandomPointInZone(randomZone);
+    return { x: point.x, y: point.y, zone: randomZone };
   }
   
-  return { x, y, zone: getZoneAtPosition(x, y)?.id };
+  // Fallback to meadow
+  const point = getRandomPointInZone('meadow');
+  return { x: point.x, y: point.y, zone: 'meadow' };
 }
 
 function spawnEnemyInZone(zoneId) {
@@ -1002,13 +1240,65 @@ function spawnZoneBoss(zoneId) {
   return bossId;
 }
 
-// Handle boss death - set respawn timer
-function onBossDeath(enemy) {
+// Handle boss death - set respawn timer and drop spell upgrades
+function onBossDeath(enemy, killer) {
   const zoneId = enemy.zone;
   if (zoneId && ZONE_BOSS_TYPES[zoneId]) {
     gameState.zoneBosses.delete(zoneId);
     gameState.bossRespawnTimers.set(zoneId, Date.now() + BOSS_RESPAWN_TIME);
     console.log(`💀 Zone boss defeated: ${enemy.name} in ${zoneId} - respawns in 30 seconds`);
+    
+    // Calculate drops for the killer
+    let drops = [];
+    if (killer) {
+      const dropResult = calculateBossDrops(enemy.type, killer.class);
+      drops = dropResult.items || [];
+      
+      // Grant bonus XP from boss
+      if (dropResult.xp) {
+        killer.xp += dropResult.xp;
+        killer.totalXp += dropResult.xp;
+        console.log(`💰 ${killer.name} received ${dropResult.xp} bonus XP from boss`);
+      }
+      
+      // Send drops to the killer and add to their collection
+      if (drops.length > 0) {
+        const socket = io.sockets.sockets.get(killer.socketId);
+        
+        // Add upgrades to player's collection (avoid duplicates)
+        for (const drop of drops) {
+          if (drop.replacesSlot) {
+            // Alternate spell - track separately
+            if (!killer.alternateSpells) killer.alternateSpells = {};
+            killer.alternateSpells[drop.id] = drop;
+          } else {
+            // Spell upgrade - add to list if not already owned
+            if (!killer.spellUpgrades) killer.spellUpgrades = [];
+            if (!killer.spellUpgrades.includes(drop.id)) {
+              killer.spellUpgrades.push(drop.id);
+            }
+          }
+        }
+        
+        // Save to database
+        savePlayerToDb(killer);
+        
+        if (socket) {
+          socket.emit('spellDrops', {
+            bossName: enemy.name,
+            items: drops.map(item => ({
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              rarity: item.rarity,
+              spell: item.spell || item.replacesSlot,
+              isAlternate: !!item.replacesSlot,
+            }))
+          });
+          console.log(`✨ ${killer.name} received ${drops.length} spell upgrade(s)!`);
+        }
+      }
+    }
     
     // Announce to all players with position for death animation
     io.emit('bossDefeated', { 
@@ -1017,9 +1307,162 @@ function onBossDeath(enemy) {
       x: enemy.x,
       y: enemy.y,
       bossType: enemy.type,
-      respawnIn: BOSS_RESPAWN_TIME 
+      respawnIn: BOSS_RESPAWN_TIME,
+      killerName: killer?.name || 'Unknown',
+      dropsCount: drops.length,
     });
   }
+}
+
+// Calculate boss drops based on boss type and player class
+function calculateBossDrops(bossType, playerClass) {
+  // Drop tables (can be moved to config module later)
+  const BOSS_DROP_TABLES = {
+    blossom_behemoth: {
+      guaranteedXp: 400,
+      drops: [
+        { item: 'blazing_speed', chance: 0.2, class: 'pyromancer' },
+        { item: 'permafrost', chance: 0.2, class: 'cryomancer' },
+        { item: 'mana_surge', chance: 0.2, class: 'arcanist' },
+      ],
+    },
+    ancient_treant: {
+      guaranteedXp: 600,
+      drops: [
+        { item: 'inferno_core', chance: 0.15, class: 'pyromancer' },
+        { item: 'glacial_shards', chance: 0.15, class: 'cryomancer' },
+        { item: 'void_touched', chance: 0.15, class: 'arcanist' },
+      ],
+    },
+    magma_titan: {
+      guaranteedXp: 1000,
+      drops: [
+        { item: 'phoenix_flame', chance: 0.1, class: 'pyromancer' },
+        { item: 'absolute_zero', chance: 0.08, class: 'cryomancer' },
+        { item: 'reality_tear', chance: 0.08, class: 'arcanist' },
+      ],
+    },
+    frost_wyrm: {
+      guaranteedXp: 1200,
+      drops: [
+        { item: 'dragons_breath', chance: 0.08, class: 'pyromancer' },
+        { item: 'ice_lance', chance: 0.1, class: 'cryomancer' },
+        { item: 'blink', chance: 0.1, class: 'arcanist' },
+      ],
+    },
+    void_overlord: {
+      guaranteedXp: 2000,
+      drops: [
+        { item: 'living_bomb', chance: 0.1, class: 'pyromancer' },
+        { item: 'frost_armor', chance: 0.1, class: 'cryomancer' },
+        { item: 'arcane_orb', chance: 0.1, class: 'arcanist' },
+      ],
+    },
+    crystal_golem: {
+      guaranteedXp: 500,
+      drops: [
+        { item: 'blazing_speed', chance: 0.15, class: 'pyromancer' },
+        { item: 'permafrost', chance: 0.15, class: 'cryomancer' },
+        { item: 'mana_surge', chance: 0.15, class: 'arcanist' },
+      ],
+    },
+    // Fallback for boss_ prefixed types
+    boss_meadow: {
+      guaranteedXp: 400,
+      drops: [
+        { item: 'blazing_speed', chance: 0.2, class: 'pyromancer' },
+        { item: 'permafrost', chance: 0.2, class: 'cryomancer' },
+        { item: 'mana_surge', chance: 0.2, class: 'arcanist' },
+      ],
+    },
+    boss_forest: {
+      guaranteedXp: 600,
+      drops: [
+        { item: 'inferno_core', chance: 0.15, class: 'pyromancer' },
+        { item: 'glacial_shards', chance: 0.15, class: 'cryomancer' },
+        { item: 'void_touched', chance: 0.15, class: 'arcanist' },
+      ],
+    },
+    boss_volcanic: {
+      guaranteedXp: 1000,
+      drops: [
+        { item: 'phoenix_flame', chance: 0.1, class: 'pyromancer' },
+        { item: 'absolute_zero', chance: 0.08, class: 'cryomancer' },
+        { item: 'reality_tear', chance: 0.08, class: 'arcanist' },
+      ],
+    },
+    boss_frozen: {
+      guaranteedXp: 1200,
+      drops: [
+        { item: 'dragons_breath', chance: 0.08, class: 'pyromancer' },
+        { item: 'ice_lance', chance: 0.1, class: 'cryomancer' },
+        { item: 'blink', chance: 0.1, class: 'arcanist' },
+      ],
+    },
+    boss_abyss: {
+      guaranteedXp: 2000,
+      drops: [
+        { item: 'living_bomb', chance: 0.1, class: 'pyromancer' },
+        { item: 'frost_armor', chance: 0.1, class: 'cryomancer' },
+        { item: 'arcane_orb', chance: 0.1, class: 'arcanist' },
+      ],
+    },
+    boss_crystal: {
+      guaranteedXp: 500,
+      drops: [
+        { item: 'blazing_speed', chance: 0.15, class: 'pyromancer' },
+        { item: 'permafrost', chance: 0.15, class: 'cryomancer' },
+        { item: 'mana_surge', chance: 0.15, class: 'arcanist' },
+      ],
+    },
+  };
+  
+  // Spell upgrade definitions
+  const SPELL_UPGRADES = {
+    // Pyromancer
+    blazing_speed: { id: 'blazing_speed', name: 'Blazing Speed', description: 'Fireballs travel 50% faster and pierce one enemy', rarity: 'uncommon', spell: 'fireball' },
+    inferno_core: { id: 'inferno_core', name: 'Inferno Core', description: 'Fireballs explode on impact dealing area damage', rarity: 'rare', spell: 'fireball' },
+    phoenix_flame: { id: 'phoenix_flame', name: 'Phoenix Flame', description: 'Meteors leave burning ground that damages over time', rarity: 'epic', spell: 'meteor' },
+    dragons_breath: { id: 'dragons_breath', name: "Dragon's Breath", description: 'Breathe a continuous stream of fire (alternate spell)', rarity: 'epic', replacesSlot: 'primary' },
+    living_bomb: { id: 'living_bomb', name: 'Living Bomb', description: 'Mark an enemy to explode after 3 seconds', rarity: 'rare', replacesSlot: 'secondary' },
+    
+    // Cryomancer
+    permafrost: { id: 'permafrost', name: 'Permafrost', description: 'Frostbolts have 20% chance to freeze enemies solid', rarity: 'uncommon', spell: 'frostbolt' },
+    glacial_shards: { id: 'glacial_shards', name: 'Glacial Shards', description: 'Frostbolts split into 3 smaller shards on impact', rarity: 'rare', spell: 'frostbolt' },
+    absolute_zero: { id: 'absolute_zero', name: 'Absolute Zero', description: 'Ice Nova freezes 2x longer and shatters frozen enemies', rarity: 'legendary', spell: 'ice_nova' },
+    ice_lance: { id: 'ice_lance', name: 'Ice Lance', description: 'Pierce all enemies, bonus damage to frozen targets', rarity: 'epic', replacesSlot: 'primary' },
+    frost_armor: { id: 'frost_armor', name: 'Frost Armor', description: 'Ice shield reduces damage and freezes attackers', rarity: 'rare', replacesSlot: 'secondary' },
+    
+    // Arcanist
+    mana_surge: { id: 'mana_surge', name: 'Mana Surge', description: 'Every 5th Arcane Missile deals triple damage', rarity: 'uncommon', spell: 'arcane_missile' },
+    void_touched: { id: 'void_touched', name: 'Void Touched', description: 'Arcane Missiles home in on enemies', rarity: 'rare', spell: 'arcane_missile' },
+    reality_tear: { id: 'reality_tear', name: 'Reality Tear', description: 'Arcane Storm creates a black hole vortex', rarity: 'legendary', spell: 'arcane_storm' },
+    arcane_orb: { id: 'arcane_orb', name: 'Arcane Orb', description: 'Slow-moving orb that deals massive damage', rarity: 'epic', replacesSlot: 'primary' },
+    blink: { id: 'blink', name: 'Blink', description: 'Teleport short distance leaving damaging afterimages', rarity: 'rare', replacesSlot: 'secondary' },
+  };
+  
+  const dropTable = BOSS_DROP_TABLES[bossType];
+  if (!dropTable) return { xp: 100, items: [] };
+  
+  const result = {
+    xp: dropTable.guaranteedXp,
+    items: [],
+  };
+  
+  for (const drop of dropTable.drops) {
+    // Only drop items for the player's class
+    if (drop.class !== playerClass) continue;
+    
+    // Check drop chance
+    if (Math.random() < drop.chance) {
+      const upgrade = SPELL_UPGRADES[drop.item];
+      if (upgrade) {
+        result.items.push(upgrade);
+      }
+    }
+  }
+  
+  return result;
 }
 
 // Initialize zone bosses on startup
@@ -1035,6 +1478,21 @@ function initZoneBosses() {
 function createProjectile(player, spell, targetX, targetY) {
   const id = uuidv4();
   const dir = normalize({ x: targetX - player.x, y: targetY - player.y });
+  const upgrades = player.spellUpgrades || [];
+  
+  // Calculate modified stats based on upgrades
+  let speed = spell.speed;
+  let isHoming = spell.homing || false;
+  
+  // Blazing Speed: 50% faster fireballs
+  if (spell.id === 'fireball' && upgrades.includes('blazing_speed')) {
+    speed *= 1.5;
+  }
+  
+  // Void Touched: Arcane missiles home in on enemies
+  if (spell.id === 'arcane_missile' && upgrades.includes('void_touched')) {
+    isHoming = true;
+  }
   
   const proj = {
     id,
@@ -1044,8 +1502,8 @@ function createProjectile(player, spell, targetX, targetY) {
     spellId: spell.id,
     x: player.x,
     y: player.y,
-    vx: dir.x * spell.speed,
-    vy: dir.y * spell.speed,
+    vx: dir.x * speed,
+    vy: dir.y * speed,
     damage: spell.damage,
     radius: spell.radius,
     color: spell.color,
@@ -1053,7 +1511,7 @@ function createProjectile(player, spell, targetX, targetY) {
     maxRange: spell.range,
     traveled: 0,
     isAoe: spell.isAoe || spell.speed === 0,
-    homing: spell.homing || false,
+    homing: isHoming,
     slowEffect: spell.slowEffect,
     slowDuration: spell.slowDuration,
     targetId: null,
@@ -1061,10 +1519,11 @@ function createProjectile(player, spell, targetX, targetY) {
   };
   
   // For homing missiles, track the target
-  if (spell.homing) {
+  if (proj.homing) {
     let nearestEnemy = null;
     let nearestDist = spell.range;
     for (const enemy of gameState.enemies.values()) {
+      if (enemy.health <= 0) continue;
       const dist = distance(player, enemy);
       if (dist < nearestDist) {
         nearestDist = dist;
@@ -1538,10 +1997,80 @@ function gameTick() {
     for (const enemy of gameState.enemies.values()) {
       if (enemy.health <= 0) continue;
       if (distance(proj, enemy) < proj.radius + enemy.radius) {
-        enemy.health -= proj.damage;
+        const owner = gameState.players.get(proj.ownerId);
+        const upgrades = owner?.spellUpgrades || [];
+        let damage = proj.damage;
+        
+        // === SPELL UPGRADE EFFECTS ===
+        
+        // Mana Surge: Every 5th arcane missile deals 3x damage
+        if (proj.spellId === 'arcane_missile' && upgrades.includes('mana_surge')) {
+          if (!owner.castCount) owner.castCount = {};
+          owner.castCount.arcane_missile = (owner.castCount.arcane_missile || 0) + 1;
+          if (owner.castCount.arcane_missile % 5 === 0) {
+            damage *= 3;
+            io.emit('empoweredHit', { x: enemy.x, y: enemy.y, type: 'mana_surge' });
+          }
+        }
+        
+        // Permafrost: 20% chance to freeze on frostbolt hit
+        if (proj.spellId === 'frostbolt' && upgrades.includes('permafrost')) {
+          if (Math.random() < 0.2) {
+            enemy.frozenUntil = now + 1500;
+            io.emit('freeze', { x: enemy.x, y: enemy.y, duration: 1500 });
+          }
+        }
+        
+        // Inferno Core: Fireballs explode on impact
+        if (proj.spellId === 'fireball' && upgrades.includes('inferno_core')) {
+          const explosionRadius = 60;
+          const explosionDamage = Math.floor(damage * 0.5);
+          
+          // Damage nearby enemies
+          for (const nearby of gameState.enemies.values()) {
+            if (nearby.id === enemy.id || nearby.health <= 0) continue;
+            if (distance(enemy, nearby) < explosionRadius) {
+              nearby.health -= explosionDamage;
+              spawnDamageNumber(nearby.x, nearby.y - 20, explosionDamage);
+              checkEnemyDeath(nearby, proj.ownerId);
+            }
+          }
+          io.emit('explosion', { x: enemy.x, y: enemy.y, radius: explosionRadius, color: '#f97316' });
+        }
+        
+        // Glacial Shards: Frostbolts split into 3 on impact
+        if (proj.spellId === 'frostbolt' && upgrades.includes('glacial_shards') && !proj.isShard) {
+          const shardCount = 3;
+          const spreadAngle = Math.PI / 4;
+          const baseAngle = Math.atan2(proj.vy, proj.vx);
+          
+          for (let i = 0; i < shardCount; i++) {
+            const angle = baseAngle + (i - 1) * (spreadAngle / 2);
+            const shardId = uuidv4();
+            gameState.projectiles.set(shardId, {
+              id: shardId,
+              ownerId: proj.ownerId,
+              ownerClass: proj.ownerClass,
+              spellId: 'frostbolt_shard',
+              isShard: true,
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(angle) * 400,
+              vy: Math.sin(angle) * 400,
+              radius: 6,
+              damage: Math.floor(damage * 0.4),
+              maxRange: 200,
+              traveled: 0,
+              color: '#67e8f9',
+            });
+          }
+        }
+        
+        // Apply damage
+        enemy.health -= damage;
         
         // Spawn damage number
-        spawnDamageNumber(enemy.x, enemy.y - 20, proj.damage);
+        spawnDamageNumber(enemy.x, enemy.y - 20, damage);
         
         // Hit particles
         spawnParticles(enemy.x, enemy.y, proj.color, 4);
@@ -1551,6 +2080,13 @@ function gameTick() {
         }
 
         checkEnemyDeath(enemy, proj.ownerId);
+        
+        // Blazing Speed: Pierce through one enemy
+        if (proj.spellId === 'fireball' && upgrades.includes('blazing_speed') && !proj.hasPierced) {
+          proj.hasPierced = true;
+          continue; // Don't mark as hit, continue flying
+        }
+        
         hit = true;
         break;
       }
@@ -1793,7 +2329,9 @@ function gameTick() {
     })),
     world: WORLD,
     zones: ZONES,
-    safeZone: { x: ZONES.sanctuary.x, y: ZONES.sanctuary.y, radius: ZONES.sanctuary.radius },
+    portals: PORTALS,
+    buildings: BUILDINGS,
+    safeZone: { polygon: ZONES.sanctuary.polygon },
   };
 
   io.emit('gameState', stateSnapshot);
@@ -1851,9 +2389,9 @@ function checkEnemyDeath(enemy, killerId) {
     // Sound event
     io.emit('sound', { type: 'enemyDeath', x: enemy.x, y: enemy.y, isBoss: enemy.isBoss });
     
-    // Zone boss death - set respawn timer
+    // Zone boss death - set respawn timer and drop loot
     if (enemy.isBoss && enemy.zone) {
-      onBossDeath(enemy);
+      onBossDeath(enemy, killer);
     }
     
     gameState.enemies.delete(enemy.id);
@@ -1926,14 +2464,17 @@ io.on('connection', (socket) => {
       playTime: saved?.playTime || 0,
       selectedSkin: skin,
       unlockedSkins,
-      x: ZONES.sanctuary.x,
-      y: ZONES.sanctuary.y,
+      spellUpgrades: saved?.spellUpgrades || [], // Track acquired spell upgrades
+      alternateSpells: saved?.alternateSpells || {}, // { slot: spellId }
+      x: 3000, // Sanctuary center
+      y: 2500,
       health: classData.baseHealth + healthBonus,
       maxHealth: classData.baseHealth + healthBonus,
       baseSpeed: classData.baseSpeed + speedBonus,
       damageMultiplier,
       input: { up: false, down: false, left: false, right: false },
       lastCast: {},
+      castCount: {}, // Track cast count for "every Nth" effects
       state: 'idle',
       facing: 'down',
       animFrame: 0,
@@ -2165,10 +2706,59 @@ io.on('connection', (socket) => {
       if (player.socketId === socket.id) {
         const classData = CLASSES[player.class];
         player.health = player.maxHealth;
-        player.x = ZONES.sanctuary.x + (Math.random() - 0.5) * 100;
-        player.y = ZONES.sanctuary.y + (Math.random() - 0.5) * 100;
+        // Spawn in center of sanctuary
+        const sanctuaryCenter = getRandomPointInZone('sanctuary');
+        player.x = sanctuaryCenter.x;
+        player.y = sanctuaryCenter.y;
         player.state = 'idle';
         socket.emit('respawned', { health: player.health });
+        break;
+      }
+    }
+  });
+
+  // Portal interaction
+  socket.on('usePortal', ({ portalId }) => {
+    const portal = PORTALS[portalId];
+    if (!portal) return;
+    
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id && player.health > 0) {
+        // Check if player is near portal entrance
+        const distToPortal = distance(player, portal.from);
+        if (distToPortal > 60) {
+          socket.emit('portalError', { message: 'Too far from portal' });
+          break;
+        }
+        
+        // Check level requirement
+        if (player.level < portal.requiredLevel) {
+          socket.emit('portalError', { message: `Requires level ${portal.requiredLevel}` });
+          break;
+        }
+        
+        // Teleport player
+        const oldX = player.x;
+        const oldY = player.y;
+        player.x = portal.to.x;
+        player.y = portal.to.y;
+        
+        // Notify client of teleport
+        socket.emit('portalUsed', {
+          portalId,
+          fromX: oldX,
+          fromY: oldY,
+          toX: portal.to.x,
+          toY: portal.to.y,
+          toZone: portal.toZone,
+          color: portal.color,
+        });
+        
+        // Sound effect for nearby players
+        io.emit('sound', { type: 'portalEnter', x: oldX, y: oldY });
+        io.emit('sound', { type: 'portalExit', x: portal.to.x, y: portal.to.y });
+        
+        console.log(`🌀 ${player.name} used portal ${portalId} to ${portal.toZone}`);
         break;
       }
     }
