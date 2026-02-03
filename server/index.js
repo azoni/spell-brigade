@@ -677,7 +677,7 @@ const ZONE_BOSS_TYPES = {
   abyss: 'boss_abyss',
 };
 
-const BOSS_RESPAWN_TIME = 5 * 60 * 1000; // 5 minutes
+const BOSS_RESPAWN_TIME = 30 * 1000; // 30 seconds
 
 // ===========================================
 // XP ORB CONFIG
@@ -1008,12 +1008,15 @@ function onBossDeath(enemy) {
   if (zoneId && ZONE_BOSS_TYPES[zoneId]) {
     gameState.zoneBosses.delete(zoneId);
     gameState.bossRespawnTimers.set(zoneId, Date.now() + BOSS_RESPAWN_TIME);
-    console.log(`💀 Zone boss defeated: ${enemy.name} in ${zoneId} - respawns in 5 minutes`);
+    console.log(`💀 Zone boss defeated: ${enemy.name} in ${zoneId} - respawns in 30 seconds`);
     
-    // Announce to all players
+    // Announce to all players with position for death animation
     io.emit('bossDefeated', { 
       name: enemy.name, 
       zone: zoneId,
+      x: enemy.x,
+      y: enemy.y,
+      bossType: enemy.type,
       respawnIn: BOSS_RESPAWN_TIME 
     });
   }
