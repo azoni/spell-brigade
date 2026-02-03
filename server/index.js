@@ -557,7 +557,7 @@ function getPlayerRank(totalXp) {
 
 // Get zone at position
 function getZoneAtPosition(x, y) {
-  const distFromCenter = Math.sqrt((x - 2000) ** 2 + (y - 2000) ** 2);
+  const distFromCenter = Math.sqrt((x - 2500) ** 2 + (y - 2500) ** 2);
   
   // Check sanctuary first
   if (distFromCenter <= ZONES.sanctuary.radius) {
@@ -751,8 +751,8 @@ function getSpawnPosition(forZone = null) {
       const angle = Math.random() * Math.PI * 2;
       const dist = zone.innerRadius + Math.random() * (zone.outerRadius - zone.innerRadius);
       return {
-        x: 2000 + Math.cos(angle) * dist,
-        y: 2000 + Math.sin(angle) * dist,
+        x: zone.x + Math.cos(angle) * dist,
+        y: zone.y + Math.sin(angle) * dist,
         zone: forZone,
       };
     }
@@ -1855,3 +1855,26 @@ httpServer.listen(PORT, () => {
   console.log(`   Classes: ${Object.keys(CLASSES).join(', ')}`);
   console.log(`\n   Ready for wizards! ✨\n`);
 });
+
+// Graceful shutdown
+const shutdown = async (signal) => {
+  console.log(`\n${signal} received. Saving all players...`);
+  
+  // Save all connected players
+  const savePromises = [];
+  for (const player of gameState.players.values()) {
+    savePromises.push(savePlayerToDb(player));
+  }
+  
+  try {
+    await Promise.all(savePromises);
+    console.log(`Saved ${savePromises.length} players. Shutting down.`);
+  } catch (err) {
+    console.error('Error saving players:', err);
+  }
+  
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
