@@ -2690,11 +2690,32 @@ function gameTick() {
 
     // Movement
     let dx = 0, dy = 0;
+    let isKeyboardMoving = false;
+    
+    // Keyboard input takes priority
     if (player.input) {
       if (player.input.up) dy -= 1;
       if (player.input.down) dy += 1;
       if (player.input.left) dx -= 1;
       if (player.input.right) dx += 1;
+      isKeyboardMoving = dx !== 0 || dy !== 0;
+    }
+    
+    // Click to move (if no keyboard input)
+    if (!isKeyboardMoving && player.clickTarget) {
+      const distToTarget = Math.sqrt(
+        Math.pow(player.clickTarget.x - player.x, 2) + 
+        Math.pow(player.clickTarget.y - player.y, 2)
+      );
+      
+      if (distToTarget > 10) {
+        // Move towards target
+        dx = player.clickTarget.x - player.x;
+        dy = player.clickTarget.y - player.y;
+      } else {
+        // Reached target, clear it
+        player.clickTarget = null;
+      }
     }
 
     const isMoving = dx !== 0 || dy !== 0;
@@ -4333,6 +4354,22 @@ io.on('connection', (socket) => {
           left: !!input.left,
           right: !!input.right,
         };
+        // Clear click target when using WASD
+        if (input.up || input.down || input.left || input.right) {
+          player.clickTarget = null;
+        }
+        break;
+      }
+    }
+  });
+  
+  // Click to move
+  socket.on('clickMove', ({ targetX, targetY }) => {
+    if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+    
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id && player.health > 0) {
+        player.clickTarget = { x: targetX, y: targetY };
         break;
       }
     }
