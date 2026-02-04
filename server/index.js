@@ -1274,53 +1274,53 @@ const ENEMY_TYPES = {
   dungeon_minotaur: {
     id: 'dungeon_minotaur',
     name: 'Ironhide Minotaur',
-    health: 2000,
-    damage: 60,
-    speed: 70,
-    radius: 35,
-    xp: 800,
+    health: 5000,
+    damage: 90,
+    speed: 80,
+    radius: 40,
+    xp: 1200,
     color: '#78350f',
     behavior: 'charge',
     isMiniBoss: true,
     isDungeon: true,
     zone: 'dungeon',
-    attackCooldown: 3000,
-    chargeSpeed: 300,
-    chargeDistance: 400,
+    attackCooldown: 2500,
+    chargeSpeed: 350,
+    chargeDistance: 500,
   },
   dungeon_lich: {
     id: 'dungeon_lich',
     name: 'Lich King',
-    health: 1500,
-    damage: 45,
-    speed: 50,
-    radius: 28,
-    xp: 700,
+    health: 4000,
+    damage: 70,
+    speed: 55,
+    radius: 32,
+    xp: 1000,
     color: '#1e1b4b',
     behavior: 'caster',
     isMiniBoss: true,
     isDungeon: true,
     zone: 'dungeon',
-    attackCooldown: 2000,
-    summonCount: 3,
+    attackCooldown: 1800,
+    summonCount: 4,
   },
   
   // DRAGON BOSS - Final boss of dungeon (2.5x bigger)
   boss_dragon: {
     id: 'boss_dragon',
     name: 'Infernal Dragon',
-    health: 15000,
-    damage: 100,
-    speed: 50, // Faster movement
-    radius: 100, // Smaller than before (was 160)
-    xp: 8000,
+    health: 40000,
+    damage: 150,
+    speed: 55,
+    radius: 120,
+    xp: 15000,
     color: '#b91c1c',
     behavior: 'boss_dragon',
     isBoss: true,
     isDungeon: true,
     zone: 'dungeon',
-    attackCooldown: 1800,
-    attackRange: 600, // Long attack range
+    attackCooldown: 1500,
+    attackRange: 700,
     attacks: ['flame_breath', 'wing_gust', 'tail_swipe', 'summon_minions', 'meteor_rain', 'rage_mode'],
   },
 };
@@ -2239,7 +2239,7 @@ function onBossDeath(enemy, killer) {
     // Set dungeon victory portal state - spawn higher up and to the side for visibility
     gameState.dungeonVictoryPortal = {
       x: enemy.x,
-      y: enemy.y - 300, // Much higher to avoid skill bar blocking
+      y: enemy.y - 350, // Much higher to avoid skill bar blocking
       active: true,
       createdAt: Date.now(),
     };
@@ -2252,7 +2252,7 @@ function onBossDeath(enemy, killer) {
     
     // Grant huge rewards
     if (killer) {
-      const dragonRewardXp = 10000;
+      const dragonRewardXp = 20000;
       killer.xp += dragonRewardXp;
       killer.totalXp += dragonRewardXp;
       killer.bossKills = killer.bossKills || {};
@@ -2552,19 +2552,19 @@ function spawnDungeonEnemies(player) {
   const baseY = player.y + 200;
   
   // Spawn a wave of enemies
-  const numEnemies = Math.min(5, 2 + Math.floor(player.y / 1000)); // More enemies deeper in
-  const depthMultiplier = 1 + (player.y / 5000) * 2; // Up to 3x at end
+  const numEnemies = Math.min(6, 2 + Math.floor(player.y / 1000)); // More enemies deeper in
+  const depthMultiplier = 1 + (player.y / 6000) * 2.5; // Up to 3.5x at end
   
   for (let i = 0; i < numEnemies; i++) {
     const type = dungeonEnemies[Math.floor(Math.random() * dungeonEnemies.length)];
     const template = ENEMY_TYPES[type];
     if (!template) continue;
     
-    const x = 400 + (i - numEnemies/2) * 100 + Math.random() * 80; // Wider spread for larger dungeon
-    const y = baseY + Math.random() * 100;
+    const x = 900 + (i - numEnemies/2) * 150 + Math.random() * 100; // Wider spread for larger dungeon
+    const y = baseY + Math.random() * 150;
     
-    // Don't spawn past dragon lair (y > 4200)
-    if (y > 4200) continue;
+    // Don't spawn past dragon lair (y > 5000)
+    if (y > 5000) continue;
     
     const enemy = {
       id: uuidv4(),
@@ -2615,8 +2615,8 @@ function spawnDragonBoss() {
     behavior: 'boss_dragon',
     isBoss: true,
     isDungeon: true,
-    x: 600, // Center of wider dungeon
-    y: 4500, // Dragon lair center (expanded dungeon)
+    x: 900, // Center of wider dungeon
+    y: 5500, // Dragon lair center (expanded dungeon)
     zone: 'dungeon',
     facing: 'up',
     animFrame: 0,
@@ -2785,39 +2785,38 @@ function gameTick() {
       player.y = clamp(player.y, 20, WORLD.height - 20);
       
       // Dungeon-specific bounds - room-based layout
-      // Dungeon is 1200 wide x 5000 tall
+      // Dungeon is 1800 wide x 6000 tall (expanded)
       if (player.inDungeon) {
         // Dungeon layout: entrance -> corridors -> rooms -> dragon lair
-        // Y coordinates: 0-5000 (expanded from 3200)
         const y = player.y;
-        let minX = 100, maxX = 1100; // Wider dungeon (1200 total)
+        let minX = 50, maxX = 1750; // Much wider dungeon (1800 total)
         
         // Different room widths
-        if (y < 400) {
+        if (y < 500) {
           // Entrance chamber - medium width
-          minX = 300; maxX = 900;
-        } else if (y < 600 || (y >= 1200 && y < 1400) || (y >= 2000 && y < 2200) || 
-                   (y >= 2800 && y < 3000) || (y >= 3600 && y < 3800)) {
+          minX = 400; maxX = 1400;
+        } else if (y < 700 || (y >= 1500 && y < 1700) || (y >= 2500 && y < 2700) || 
+                   (y >= 3500 && y < 3700) || (y >= 4500 && y < 4700)) {
           // Corridors - narrow
-          minX = 450; maxX = 750;
-        } else if (y >= 4200) {
-          // Dragon lair - extra wide arena
-          minX = 100; maxX = 1100;
+          minX = 550; maxX = 1250;
+        } else if (y >= 5000) {
+          // Dragon lair - massive wide arena
+          minX = 50; maxX = 1750;
         } else {
           // Regular rooms - wide
-          minX = 200; maxX = 1000;
+          minX = 200; maxX = 1600;
         }
         
         player.x = clamp(player.x, minX, maxX);
-        player.y = clamp(player.y, 50, 4900); // Taller dungeon
+        player.y = clamp(player.y, 50, 5900); // Taller dungeon
         
-        // Track dungeon room/depth for client rendering (0-8 rooms now)
-        if (y < 400) player.dungeonRoom = 0; // Entrance
-        else if (y < 1200) player.dungeonRoom = 1; // Room 1
-        else if (y < 2000) player.dungeonRoom = 2; // Room 2 (mini-boss)
-        else if (y < 2800) player.dungeonRoom = 3; // Room 3
-        else if (y < 3600) player.dungeonRoom = 4; // Room 4 (mini-boss)
-        else if (y < 4200) player.dungeonRoom = 5; // Room 5
+        // Track dungeon room/depth for client rendering
+        if (y < 500) player.dungeonRoom = 0; // Entrance
+        else if (y < 1500) player.dungeonRoom = 1; // Room 1
+        else if (y < 2500) player.dungeonRoom = 2; // Room 2 (mini-boss)
+        else if (y < 3500) player.dungeonRoom = 3; // Room 3
+        else if (y < 4500) player.dungeonRoom = 4; // Room 4 (mini-boss)
+        else if (y < 5000) player.dungeonRoom = 5; // Room 5
         else player.dungeonRoom = 6; // Dragon lair
       }
     }
@@ -2839,7 +2838,7 @@ function gameTick() {
         });
         
         // Screen shake for nearby dungeon players
-        io.emit('dragonAwakens', { x: 600, y: 4500 });
+        io.emit('dragonAwakens', { x: 900, y: 5500 });
       }
       
       // Spawn enemies when entering a new room (not entrance or dragon lair)
@@ -2848,20 +2847,20 @@ function gameTick() {
         
         // Room-specific enemy spawning - includes mini-bosses in rooms 2 and 4
         const roomEnemies = {
-          1: ['dungeon_skeleton', 'dungeon_skeleton', 'dungeon_skeleton', 'dungeon_wraith'],
-          2: ['dungeon_wraith', 'dungeon_wraith', 'dungeon_skeleton', 'dungeon_minotaur'], // Mini-boss: Minotaur
-          3: ['dungeon_golem', 'dungeon_golem', 'dungeon_wraith', 'dungeon_wraith'],
-          4: ['dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_lich'], // Mini-boss: Lich
-          5: ['dungeon_demon', 'dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_golem'],
+          1: ['dungeon_skeleton', 'dungeon_skeleton', 'dungeon_skeleton', 'dungeon_wraith', 'dungeon_skeleton'],
+          2: ['dungeon_wraith', 'dungeon_wraith', 'dungeon_skeleton', 'dungeon_skeleton', 'dungeon_minotaur'], // Mini-boss: Minotaur
+          3: ['dungeon_golem', 'dungeon_golem', 'dungeon_wraith', 'dungeon_wraith', 'dungeon_golem'],
+          4: ['dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_golem', 'dungeon_lich'], // Mini-boss: Lich
+          5: ['dungeon_demon', 'dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_golem', 'dungeon_wraith'],
         };
         
         const enemies = roomEnemies[currentRoom] || ['dungeon_skeleton'];
         const roomY = {
-          1: 900, // Skeleton room center
-          2: 1700, // Wraith room center - has Minotaur
-          3: 2500, // Golem room center
-          4: 3300, // Demon room center - has Lich
-          5: 4000, // Shadow hall
+          1: 1100, // Skeleton room center
+          2: 2100, // Wraith room center - has Minotaur
+          3: 3100, // Golem room center
+          4: 4100, // Demon room center - has Lich
+          5: 4800, // Shadow hall
         };
         
         const depthMultiplier = 1 + currentRoom * 0.25;
@@ -2871,8 +2870,8 @@ function gameTick() {
           const template = ENEMY_TYPES[type];
           if (!template) continue;
           
-          const spawnX = 300 + Math.random() * 600; // Wider spawn area
-          const spawnY = roomY[currentRoom] + (Math.random() - 0.5) * 300; // Larger vertical spread
+          const spawnX = 400 + Math.random() * 1000; // Wider spawn area for expanded dungeon
+          const spawnY = roomY[currentRoom] + (Math.random() - 0.5) * 400; // Larger vertical spread
           
           const enemy = {
             id: uuidv4(),
@@ -5506,8 +5505,8 @@ io.on('connection', (socket) => {
         player.preDungeonY = player.y;
         
         // Transport to dungeon - starts in entrance chamber
-        player.x = 400;  // Center of entrance chamber
-        player.y = 300;  // Near entrance
+        player.x = 900;  // Center of wider entrance chamber
+        player.y = 350;  // Near entrance
         player.inDungeon = true;
         player.dungeonProgress = 0;
         player.dungeonWaveSpawned = 0;
