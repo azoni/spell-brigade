@@ -1274,21 +1274,22 @@ const ENEMY_TYPES = {
     summonCount: 3,
   },
   
-  // DRAGON BOSS - Final boss of dungeon (4x bigger)
+  // DRAGON BOSS - Final boss of dungeon (2.5x bigger)
   boss_dragon: {
     id: 'boss_dragon',
     name: 'Infernal Dragon',
     health: 15000,
     damage: 100,
-    speed: 35,
-    radius: 160, // 4x bigger (was 40, now 160)
+    speed: 50, // Faster movement
+    radius: 100, // Smaller than before (was 160)
     xp: 8000,
     color: '#b91c1c',
     behavior: 'boss_dragon',
     isBoss: true,
     isDungeon: true,
     zone: 'dungeon',
-    attackCooldown: 2000,
+    attackCooldown: 1800,
+    attackRange: 600, // Long attack range
     attacks: ['flame_breath', 'wing_gust', 'tail_swipe', 'summon_minions', 'meteor_rain', 'rage_mode'],
   },
 };
@@ -2195,10 +2196,10 @@ function onBossDeath(enemy, killer) {
       killerName: killer?.name || 'Unknown Hero',
     });
     
-    // Set dungeon victory portal state
+    // Set dungeon victory portal state - spawn higher up and to the side for visibility
     gameState.dungeonVictoryPortal = {
       x: enemy.x,
-      y: enemy.y - 100,
+      y: enemy.y - 300, // Much higher to avoid skill bar blocking
       active: true,
       createdAt: Date.now(),
     };
@@ -2519,11 +2520,11 @@ function spawnDungeonEnemies(player) {
     const template = ENEMY_TYPES[type];
     if (!template) continue;
     
-    const x = 250 + (i - numEnemies/2) * 80 + Math.random() * 50;
+    const x = 400 + (i - numEnemies/2) * 100 + Math.random() * 80; // Wider spread for larger dungeon
     const y = baseY + Math.random() * 100;
     
-    // Don't spawn past dragon lair
-    if (y > 2800) continue;
+    // Don't spawn past dragon lair (y > 4200)
+    if (y > 4200) continue;
     
     const enemy = {
       id: uuidv4(),
@@ -2574,8 +2575,8 @@ function spawnDragonBoss() {
     behavior: 'boss_dragon',
     isBoss: true,
     isDungeon: true,
-    x: 400,
-    y: 3000, // Dragon lair center
+    x: 600, // Center of wider dungeon
+    y: 4500, // Dragon lair center (expanded dungeon)
     zone: 'dungeon',
     facing: 'up',
     animFrame: 0,
@@ -2584,6 +2585,7 @@ function spawnDragonBoss() {
     lastAbility: 0,
     phase: 1, // Dragon has multiple phases
     attackPattern: 0,
+    attackRange: template.attackRange || 600, // Long attack range
   };
   
   gameState.enemies.set(dragon.id, dragon);
@@ -2742,37 +2744,40 @@ function gameTick() {
       player.y = clamp(player.y, 20, WORLD.height - 20);
       
       // Dungeon-specific bounds - room-based layout
+      // Dungeon is 1200 wide x 5000 tall
       if (player.inDungeon) {
         // Dungeon layout: entrance -> corridors -> rooms -> dragon lair
-        // Y coordinates: 0-3200
+        // Y coordinates: 0-5000 (expanded from 3200)
         const y = player.y;
-        let minX = 100, maxX = 700;
+        let minX = 100, maxX = 1100; // Wider dungeon (1200 total)
         
         // Different room widths
         if (y < 400) {
           // Entrance chamber - medium width
-          minX = 200; maxX = 600;
-        } else if (y < 600 || (y >= 1000 && y < 1200) || (y >= 1600 && y < 1800) || (y >= 2200 && y < 2400)) {
+          minX = 300; maxX = 900;
+        } else if (y < 600 || (y >= 1200 && y < 1400) || (y >= 2000 && y < 2200) || 
+                   (y >= 2800 && y < 3000) || (y >= 3600 && y < 3800)) {
           // Corridors - narrow
-          minX = 300; maxX = 500;
-        } else if (y >= 2800) {
-          // Dragon lair - wide arena
-          minX = 100; maxX = 700;
+          minX = 450; maxX = 750;
+        } else if (y >= 4200) {
+          // Dragon lair - extra wide arena
+          minX = 100; maxX = 1100;
         } else {
-          // Regular rooms - medium-wide
-          minX = 150; maxX = 650;
+          // Regular rooms - wide
+          minX = 200; maxX = 1000;
         }
         
         player.x = clamp(player.x, minX, maxX);
-        player.y = clamp(player.y, 50, 3150); // Can't go past dragon lair end
+        player.y = clamp(player.y, 50, 4900); // Taller dungeon
         
-        // Track dungeon room for client rendering
-        if (y < 400) player.dungeonRoom = 0;
-        else if (y < 1000) player.dungeonRoom = 1;
-        else if (y < 1600) player.dungeonRoom = 2;
-        else if (y < 2200) player.dungeonRoom = 3;
-        else if (y < 2800) player.dungeonRoom = 4;
-        else player.dungeonRoom = 5; // Dragon lair
+        // Track dungeon room/depth for client rendering (0-8 rooms now)
+        if (y < 400) player.dungeonRoom = 0; // Entrance
+        else if (y < 1200) player.dungeonRoom = 1; // Room 1
+        else if (y < 2000) player.dungeonRoom = 2; // Room 2 (mini-boss)
+        else if (y < 2800) player.dungeonRoom = 3; // Room 3
+        else if (y < 3600) player.dungeonRoom = 4; // Room 4 (mini-boss)
+        else if (y < 4200) player.dungeonRoom = 5; // Room 5
+        else player.dungeonRoom = 6; // Dragon lair
       }
     }
     
@@ -2781,8 +2786,8 @@ function gameTick() {
       const currentRoom = player.dungeonRoom || 0;
       const lastRoom = player.dungeonRoomCleared || -1;
       
-      // Spawn dragon when entering dragon lair (room 5)
-      if (currentRoom === 5 && !player.dragonSpawned) {
+      // Spawn dragon when entering dragon lair (room 6)
+      if (currentRoom === 6 && !player.dragonSpawned) {
         player.dragonSpawned = true;
         spawnDragonBoss();
         
@@ -2793,11 +2798,11 @@ function gameTick() {
         });
         
         // Screen shake for nearby dungeon players
-        io.emit('dragonAwakens', { x: 400, y: 3000 });
+        io.emit('dragonAwakens', { x: 600, y: 4500 });
       }
       
       // Spawn enemies when entering a new room (not entrance or dragon lair)
-      if (currentRoom > lastRoom && currentRoom > 0 && currentRoom < 5) {
+      if (currentRoom > lastRoom && currentRoom > 0 && currentRoom < 6) {
         player.dungeonRoomCleared = currentRoom;
         
         // Room-specific enemy spawning - includes mini-bosses in rooms 2 and 4
@@ -2806,14 +2811,16 @@ function gameTick() {
           2: ['dungeon_wraith', 'dungeon_wraith', 'dungeon_skeleton', 'dungeon_minotaur'], // Mini-boss: Minotaur
           3: ['dungeon_golem', 'dungeon_golem', 'dungeon_wraith', 'dungeon_wraith'],
           4: ['dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_lich'], // Mini-boss: Lich
+          5: ['dungeon_demon', 'dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_golem'],
         };
         
         const enemies = roomEnemies[currentRoom] || ['dungeon_skeleton'];
         const roomY = {
-          1: 700, // Skeleton room center
-          2: 1400, // Wraith room center - has Minotaur
-          3: 2000, // Golem room center
-          4: 2600, // Demon room center - has Lich
+          1: 900, // Skeleton room center
+          2: 1700, // Wraith room center - has Minotaur
+          3: 2500, // Golem room center
+          4: 3300, // Demon room center - has Lich
+          5: 4000, // Shadow hall
         };
         
         const depthMultiplier = 1 + currentRoom * 0.25;
@@ -2823,8 +2830,8 @@ function gameTick() {
           const template = ENEMY_TYPES[type];
           if (!template) continue;
           
-          const spawnX = 200 + Math.random() * 400;
-          const spawnY = roomY[currentRoom] + (Math.random() - 0.5) * 200;
+          const spawnX = 300 + Math.random() * 600; // Wider spawn area
+          const spawnY = roomY[currentRoom] + (Math.random() - 0.5) * 300; // Larger vertical spread
           
           const enemy = {
             id: uuidv4(),
@@ -3339,9 +3346,12 @@ function gameTick() {
     
     // ========== DRAGON BOSS ATTACKS ==========
     if (enemy.type === 'boss_dragon' && nearestPlayer) {
-      const attackCooldown = 2000 - (enemy.phase || 1) * 200; // Faster in higher phases
+      const distToPlayer = distance(enemy, nearestPlayer);
+      const attackRange = enemy.attackRange || 600;
+      const attackCooldown = 1500 - (enemy.phase || 1) * 200; // Faster in higher phases
       
-      if (now - (enemy.lastAbility || 0) > attackCooldown) {
+      // Dragon has long attack range - attacks even from far away
+      if (distToPlayer < attackRange && now - (enemy.lastAbility || 0) > attackCooldown) {
         enemy.lastAbility = now;
         
         // Cycle through attacks
@@ -3356,10 +3366,10 @@ function gameTick() {
         }
         
         if (attack === 0) {
-          // FLAME BREATH - Cone of fire toward player
+          // FLAME BREATH - Cone of fire toward player (longer range)
           const dir = normalize({ x: nearestPlayer.x - enemy.x, y: nearestPlayer.y - enemy.y });
           const coneAngle = Math.PI / 3; // 60 degree cone
-          const coneRange = 300;
+          const coneRange = 500; // Increased from 300
           const baseAngle = Math.atan2(dir.y, dir.x);
           
           // Warning
@@ -3398,28 +3408,28 @@ function gameTick() {
           }, 500);
           
         } else if (attack === 1) {
-          // WING GUST - Pushes players back
-          io.emit('dragonWingGust', { x: enemy.x, y: enemy.y, radius: 250 });
+          // WING GUST - Pushes players back (larger radius)
+          io.emit('dragonWingGust', { x: enemy.x, y: enemy.y, radius: 400 });
           
           for (const player of gameState.players.values()) {
             if (player.health <= 0 || !player.inDungeon) continue;
             const dist = distance(enemy, player);
-            if (dist < 250) {
+            if (dist < 400) {
               const pushDir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
-              player.x += pushDir.x * 100;
-              player.y = Math.max(100, Math.min(4800, player.y + pushDir.y * 100));
-              player.x = clamp(player.x, 150, 750);
+              player.x += pushDir.x * 150;
+              player.y = Math.max(100, Math.min(4800, player.y + pushDir.y * 150));
+              player.x = clamp(player.x, 150, 1050);
             }
           }
           
         } else if (attack === 2) {
-          // TAIL SWIPE - Close range damage
-          io.emit('dragonTailSwipe', { x: enemy.x, y: enemy.y, radius: 150 });
+          // TAIL SWIPE - Close range damage (larger area)
+          io.emit('dragonTailSwipe', { x: enemy.x, y: enemy.y, radius: 250 });
           
           for (const player of gameState.players.values()) {
             if (player.health <= 0 || !player.inDungeon) continue;
             if (player.invincible) continue; // Admin invincibility
-            if (distance(enemy, player) < 150) {
+            if (distance(enemy, player) < 250) {
               player.health -= 40 + (enemy.phase - 1) * 10;
               io.to(player.socketId).emit('damaged', { amount: 40, fromX: enemy.x, fromY: enemy.y });
               spawnDamageNumber(player.x, player.y - 20, 40);
