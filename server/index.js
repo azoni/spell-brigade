@@ -203,8 +203,8 @@ const PORTALS = {
   sanctuary_to_meadow: {
     id: 'sanctuary_to_meadow',
     name: 'Meadow Path',
-    from: { x: 3000, y: 2350 },
-    to: { x: 3000, y: 1900 },  // Further into meadow
+    from: { x: 3200, y: 2200 },
+    to: { x: 3200, y: 1800 },  // Further into meadow
     fromZone: 'sanctuary',
     toZone: 'meadow',
     color: '#84cc16',
@@ -836,6 +836,9 @@ async function savePlayerToDb(player) {
     unlockedSkins: player.unlockedSkins || [`${player.class}_default`],
     highestZone: player.highestZone || 'meadow',
     achievements: player.achievements || [],
+    bossKills: player.bossKills || {},
+    questComplete: player.questComplete || false,
+    spellUpgrades: player.spellUpgrades || [],
     createdAt: player.createdAt || new Date().toISOString(),
     lastSeen: new Date().toISOString(),
   };
@@ -2785,6 +2788,8 @@ io.on('connection', (socket) => {
       unlockedSkins,
       spellUpgrades: saved?.spellUpgrades || [], // Track acquired spell upgrades
       alternateSpells: saved?.alternateSpells || {}, // { slot: spellId }
+      bossKills: saved?.bossKills || {}, // Track defeated zone bosses
+      questComplete: saved?.questComplete || false,
       x: 3000, // Sanctuary center
       y: 2500,
       health: classData.baseHealth + healthBonus,
@@ -2824,6 +2829,8 @@ io.on('connection', (socket) => {
         unlockedSkins: player.unlockedSkins,
         rank,
         damageMultiplier: player.damageMultiplier,
+        bossKills: player.bossKills,
+        questComplete: player.questComplete,
       },
       world: WORLD,
       zones: ZONES,
