@@ -3307,18 +3307,40 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Recall to Sanctuary (B key)
+  // Recall to Sanctuary (B key) - 5 second cooldown
   socket.on('recall', () => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id && player.health > 0) {
+        const now = Date.now();
+        const RECALL_COOLDOWN = 5000; // 5 seconds
+        
+        // Check cooldown
+        if (player.lastRecall && now - player.lastRecall < RECALL_COOLDOWN) {
+          const remaining = Math.ceil((RECALL_COOLDOWN - (now - player.lastRecall)) / 1000);
+          socket.emit('recallCooldown', { remaining });
+          break;
+        }
+        
+        // Store starting position for effect
+        const fromX = player.x;
+        const fromY = player.y;
+        
+        // Set cooldown
+        player.lastRecall = now;
+        
         // Teleport to sanctuary center
         player.x = 3000;
         player.y = 2500;
         
-        // Notify client
-        socket.emit('recalled', { x: 3000, y: 2500 });
+        // Notify client with both positions
+        socket.emit('recalled', { 
+          fromX, fromY, 
+          toX: 3000, toY: 2500,
+          cooldown: RECALL_COOLDOWN,
+        });
         
-        // Visual effect at both locations
+        // Visual effect at departure location for other players
+        io.emit('recallEffect', { x: fromX, y: fromY, playerId: player.id });
         io.emit('sound', { type: 'portalEnter', x: player.x, y: player.y });
         break;
       }
