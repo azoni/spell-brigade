@@ -38,8 +38,8 @@ if (FIREBASE_ENABLED) {
 // WORLD & ZONES - Polygon-based World Map
 // ===========================================
 const WORLD = {
-  width: 6000,
-  height: 5000,
+  width: 7000,
+  height: 6000,
 };
 
 // Helper: Check if point is inside polygon
@@ -55,28 +55,31 @@ function pointInPolygon(x, y, polygon) {
   return inside;
 }
 
-// Zones with polygon boundaries
+// Zones with polygon boundaries - Updated for larger world (7000x6000)
+const SANCTUARY_CENTER = { x: 3500, y: 3000 };
+const SANCTUARY_RADIUS = 400;
+const SANCTUARY_BUFFER = 150; // Enemies won't get closer than this to sanctuary
+
 const ZONES = {
   sanctuary: {
     id: 'sanctuary',
     name: 'Sanctuary',
-    description: 'Safe starting area. Heal and prepare here.',
+    description: 'Safe starting area with portal hub and healing fountain.',
     color: '#22c55e',
     isSafe: true,
     enemyLevel: 0,
     enemyTypes: [],
     recommendedLevel: 0,
-    // Center point and radius for backward compatibility
-    x: 3000,
-    y: 2500,
-    radius: 350,
+    x: SANCTUARY_CENTER.x,
+    y: SANCTUARY_CENTER.y,
+    radius: SANCTUARY_RADIUS,
     polygon: [
-      { x: 2650, y: 2150 },
-      { x: 3350, y: 2150 },
-      { x: 3550, y: 2500 },
-      { x: 3350, y: 2850 },
-      { x: 2650, y: 2850 },
-      { x: 2450, y: 2500 },
+      { x: 3500, y: 2550 },
+      { x: 3850, y: 2775 },
+      { x: 3850, y: 3225 },
+      { x: 3500, y: 3450 },
+      { x: 3150, y: 3225 },
+      { x: 3150, y: 2775 },
     ],
   },
   dungeon: {
@@ -90,12 +93,11 @@ const ZONES = {
     xpMultiplier: 5.0,
     recommendedLevel: 30,
     isDungeon: true,
-    // Linear corridor dungeon - separate instance
     polygon: [
-      { x: 100, y: 100 },
-      { x: 800, y: 100 },
-      { x: 800, y: 4900 },
-      { x: 100, y: 4900 },
+      { x: 0, y: 0 },
+      { x: 800, y: 0 },
+      { x: 800, y: 3200 },
+      { x: 0, y: 3200 },
     ],
   },
   meadow: {
@@ -108,14 +110,9 @@ const ZONES = {
     xpMultiplier: 1.0,
     recommendedLevel: 1,
     polygon: [
-      { x: 2200, y: 1800 },
-      { x: 3800, y: 1800 },
-      { x: 4200, y: 2200 },
-      { x: 4000, y: 3000 },
-      { x: 3500, y: 3200 },
-      { x: 2500, y: 3200 },
-      { x: 2000, y: 3000 },
-      { x: 1800, y: 2200 },
+      { x: 2500, y: 2000 }, { x: 4500, y: 2000 }, { x: 5000, y: 2500 },
+      { x: 5000, y: 3500 }, { x: 4500, y: 4000 }, { x: 2500, y: 4000 },
+      { x: 2000, y: 3500 }, { x: 2000, y: 2500 },
     ],
     excludeZones: ['sanctuary'],
   },
@@ -129,14 +126,9 @@ const ZONES = {
     xpMultiplier: 1.5,
     recommendedLevel: 5,
     polygon: [
-      { x: 500, y: 1000 },
-      { x: 2000, y: 800 },
-      { x: 2200, y: 1800 },
-      { x: 1800, y: 2200 },
-      { x: 1500, y: 3000 },
-      { x: 800, y: 3200 },
-      { x: 300, y: 2500 },
-      { x: 200, y: 1500 },
+      { x: 300, y: 300 }, { x: 2200, y: 300 }, { x: 2500, y: 2000 },
+      { x: 2000, y: 2500 }, { x: 1500, y: 2800 }, { x: 600, y: 2500 },
+      { x: 200, y: 1800 }, { x: 200, y: 800 },
     ],
   },
   volcanic: {
@@ -149,14 +141,9 @@ const ZONES = {
     xpMultiplier: 2.0,
     recommendedLevel: 10,
     polygon: [
-      { x: 4000, y: 800 },
-      { x: 5500, y: 1000 },
-      { x: 5800, y: 2000 },
-      { x: 5500, y: 3000 },
-      { x: 4500, y: 3200 },
-      { x: 4000, y: 3000 },
-      { x: 4200, y: 2200 },
-      { x: 3800, y: 1800 },
+      { x: 4800, y: 300 }, { x: 6700, y: 300 }, { x: 6800, y: 1800 },
+      { x: 6500, y: 2500 }, { x: 5500, y: 2800 }, { x: 5000, y: 2500 },
+      { x: 4500, y: 2000 }, { x: 4500, y: 800 },
     ],
   },
   frozen: {
@@ -169,32 +156,23 @@ const ZONES = {
     xpMultiplier: 2.5,
     recommendedLevel: 15,
     polygon: [
-      { x: 1000, y: 3500 },
-      { x: 2500, y: 3200 },
-      { x: 3500, y: 3200 },
-      { x: 4000, y: 3500 },
-      { x: 3800, y: 4500 },
-      { x: 3000, y: 4800 },
-      { x: 2000, y: 4800 },
-      { x: 1200, y: 4500 },
+      { x: 1800, y: 4000 }, { x: 5200, y: 4000 }, { x: 5500, y: 4500 },
+      { x: 5200, y: 5700 }, { x: 1800, y: 5700 }, { x: 1500, y: 4500 },
     ],
   },
   abyss: {
     id: 'abyss',
     name: 'The Abyss',
-    description: 'Only the strongest survive. Bosses spawn here.',
-    color: '#581c87',
+    description: 'Only the strongest survive. Extreme danger.',
+    color: '#7c3aed',
     enemyLevel: 5,
     enemyTypes: ['golem', 'necromancer', 'fireElemental', 'iceElemental'],
     xpMultiplier: 3.0,
     recommendedLevel: 20,
     bossChance: 0.02,
     polygon: [
-      { x: 200, y: 200 },
-      { x: 1200, y: 100 },
-      { x: 600, y: 1000 },
-      { x: 200, y: 1500 },
-      { x: 100, y: 800 },
+      { x: 100, y: 100 }, { x: 1000, y: 100 }, { x: 1200, y: 300 },
+      { x: 800, y: 1200 }, { x: 200, y: 1500 }, { x: 100, y: 800 },
     ],
   },
   crystal_caves: {
@@ -207,77 +185,94 @@ const ZONES = {
     xpMultiplier: 1.8,
     recommendedLevel: 8,
     polygon: [
-      { x: 4500, y: 3500 },
-      { x: 5500, y: 3200 },
-      { x: 5800, y: 4000 },
-      { x: 5500, y: 4800 },
-      { x: 4800, y: 4500 },
-      { x: 4300, y: 4000 },
+      { x: 6000, y: 3000 }, { x: 6800, y: 2800 }, { x: 6900, y: 3500 },
+      { x: 6800, y: 4500 }, { x: 6200, y: 5000 }, { x: 5800, y: 4200 },
+      { x: 5800, y: 3400 },
     ],
   },
 };
 
-// Portal definitions
+// Helper: Check if position is too close to sanctuary (for enemy spawning/movement)
+function isTooCloseToSanctuary(x, y) {
+  const dx = x - SANCTUARY_CENTER.x;
+  const dy = y - SANCTUARY_CENTER.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  return dist < (SANCTUARY_RADIUS + SANCTUARY_BUFFER);
+}
+
+// Portal definitions - All portals in sanctuary hub, teleport to zone centers
 const PORTALS = {
-  sanctuary_to_meadow: {
-    id: 'sanctuary_to_meadow',
-    name: 'Meadow Path',
-    from: { x: 3200, y: 2200 },
-    to: { x: 3200, y: 1800 },  // Further into meadow
+  portal_meadow: {
+    id: 'portal_meadow',
+    name: 'Meadow Portal',
+    icon: '🌸',
+    from: { x: 3500, y: 2650 },  // North position in sanctuary
+    to: { x: 3500, y: 2100 },    // Just outside sanctuary in meadow
     fromZone: 'sanctuary',
     toZone: 'meadow',
     color: '#84cc16',
     requiredLevel: 0,
+    description: 'Peaceful fields for beginners',
   },
-  meadow_to_forest: {
-    id: 'meadow_to_forest',
-    name: 'Forest Gateway',
-    from: { x: 1900, y: 2000 },
-    to: { x: 1400, y: 1800 },  // Deeper into forest
-    fromZone: 'meadow',
+  portal_forest: {
+    id: 'portal_forest',
+    name: 'Forest Portal',
+    icon: '🌲',
+    from: { x: 3200, y: 2850 },  // Northwest position
+    to: { x: 1400, y: 1400 },    // Center of forest
+    fromZone: 'sanctuary',
     toZone: 'forest',
     color: '#166534',
-    requiredLevel: 3,
+    requiredLevel: 5,
+    description: 'Dark woods with lurking dangers',
   },
-  meadow_to_volcanic: {
-    id: 'meadow_to_volcanic',
-    name: 'Flame Portal',
-    from: { x: 4100, y: 2000 },
-    to: { x: 4600, y: 1800 },  // Into volcanic region
-    fromZone: 'meadow',
+  portal_volcanic: {
+    id: 'portal_volcanic',
+    name: 'Volcanic Portal',
+    icon: '🔥',
+    from: { x: 3800, y: 2850 },  // Northeast position
+    to: { x: 5800, y: 1400 },    // Center of volcanic
+    fromZone: 'sanctuary',
     toZone: 'volcanic',
     color: '#dc2626',
-    requiredLevel: 8,
+    requiredLevel: 10,
+    description: 'Scorching lands of fire',
   },
-  meadow_to_frozen: {
-    id: 'meadow_to_frozen',
-    name: 'Frozen Gate',
-    from: { x: 3000, y: 3100 },
-    to: { x: 3000, y: 3700 },  // Deep into frozen
-    fromZone: 'meadow',
+  portal_frozen: {
+    id: 'portal_frozen',
+    name: 'Frozen Portal',
+    icon: '❄️',
+    from: { x: 3500, y: 3350 },  // South position
+    to: { x: 3500, y: 4800 },    // Center of frozen
+    fromZone: 'sanctuary',
     toZone: 'frozen',
     color: '#0ea5e9',
-    requiredLevel: 12,
+    requiredLevel: 15,
+    description: 'Icy wastes of the south',
   },
-  forest_to_abyss: {
-    id: 'forest_to_abyss',
-    name: 'Void Rift',
-    from: { x: 600, y: 1200 },
-    to: { x: 300, y: 600 },  // Into the abyss
-    fromZone: 'forest',
-    toZone: 'abyss',
-    color: '#581c87',
-    requiredLevel: 18,
-  },
-  volcanic_to_crystal: {
-    id: 'volcanic_to_crystal',
-    name: 'Crystal Passage',
-    from: { x: 5000, y: 3100 },
-    to: { x: 5200, y: 3700 },  // Into crystal caves
-    fromZone: 'volcanic',
+  portal_crystal: {
+    id: 'portal_crystal',
+    name: 'Crystal Portal',
+    icon: '💎',
+    from: { x: 3800, y: 3150 },  // Southeast position
+    to: { x: 6300, y: 3800 },    // Center of crystal caves
+    fromZone: 'sanctuary',
     toZone: 'crystal_caves',
     color: '#ec4899',
-    requiredLevel: 6,
+    requiredLevel: 8,
+    description: 'Glittering underground caves',
+  },
+  portal_abyss: {
+    id: 'portal_abyss',
+    name: 'Abyss Portal',
+    icon: '🌀',
+    from: { x: 3200, y: 3150 },  // Southwest position
+    to: { x: 500, y: 700 },      // Center of abyss
+    fromZone: 'sanctuary',
+    toZone: 'abyss',
+    color: '#7c3aed',
+    requiredLevel: 20,
+    description: 'The darkest depths - extreme danger',
   },
 };
 
@@ -286,8 +281,8 @@ const BUILDINGS = {
   wizard_tower: {
     id: 'wizard_tower',
     name: "Archmage's Tower",
-    x: 3000, y: 2500,
-    width: 80, height: 120,
+    x: 3500, y: 2800,
+    width: 60, height: 100,
     zone: 'sanctuary',
     color: '#ffd93d',
     interactable: true,
@@ -296,7 +291,7 @@ const BUILDINGS = {
   forest_ruins: {
     id: 'forest_ruins',
     name: 'Ancient Ruins',
-    x: 1200, y: 2000,
+    x: 1200, y: 1600,
     width: 150, height: 100,
     zone: 'forest',
     color: '#78716c',
@@ -305,7 +300,7 @@ const BUILDINGS = {
   volcano_fortress: {
     id: 'volcano_fortress',
     name: 'Obsidian Fortress',
-    x: 5200, y: 2000,
+    x: 5900, y: 1600,
     width: 180, height: 140,
     zone: 'volcanic',
     color: '#7f1d1d',
@@ -314,7 +309,7 @@ const BUILDINGS = {
   ice_citadel: {
     id: 'ice_citadel',
     name: 'Ice Citadel',
-    x: 2500, y: 4200,
+    x: 3500, y: 5000,
     width: 160, height: 130,
     zone: 'frozen',
     color: '#0284c7',
@@ -323,31 +318,33 @@ const BUILDINGS = {
   void_shrine: {
     id: 'void_shrine',
     name: 'Void Shrine',
-    x: 400, y: 600,
+    x: 500, y: 500,
     width: 100, height: 100,
     zone: 'abyss',
-    color: '#581c87',
+    color: '#7c3aed',
     interactable: true,
   },
   crystal_sanctum: {
     id: 'crystal_sanctum',
     name: 'Crystal Sanctum',
-    x: 5200, y: 4000,
+    x: 6400, y: 4000,
     width: 120, height: 110,
     zone: 'crystal_caves',
     color: '#ec4899',
     interactable: true,
   },
-  // Sanctuary Campfire
-  campfire: {
-    id: 'campfire',
-    name: 'Campfire',
-    x: 2600, y: 2850,
-    width: 40, height: 40,
+  // Healing Fountain in sanctuary center
+  healing_fountain: {
+    id: 'healing_fountain',
+    name: 'Healing Fountain',
+    x: 3500, y: 3000,
+    width: 100, height: 100,
     zone: 'sanctuary',
-    color: '#f97316',
+    color: '#22c55e',
     interactable: false,
     isDecoration: true,
+    healingRadius: 100,
+    healRate: 15, // HP per second when standing in fountain
   },
 };
 
@@ -359,7 +356,7 @@ const NPCS = {
     id: 'ethereal_guide',
     name: 'Ethereal Guide',
     type: 'guide',
-    x: 2700, y: 2800,
+    x: 3400, y: 2700,
     radius: 20,
     zone: 'sanctuary',
     color: '#67e8f9',
@@ -371,23 +368,55 @@ const NPCS = {
       "Greetings, wizard. The sanctuary protects all who seek refuge.",
       "The world beyond grows dark. Prepare yourself well.",
       "I have watched countless heroes pass through. Will you be different?",
-      "The bosses of each zone guard ancient power. Defeat them all to prove your worth.",
-      "Sanctuary heals all wounds. Rest here before venturing forth.",
-      "The path to mastery is long. Take it one step at a time.",
+      "The healing fountain at the center restores your strength. Use it wisely.",
+      "The portal hub will take you to any zone. But beware - some require great power.",
     ],
+  },
+  quest_master: {
+    id: 'quest_master',
+    name: 'Quest Master Seraphina',
+    type: 'quest_master',
+    x: 3350, y: 2850,
+    radius: 18,
+    zone: 'sanctuary',
+    color: '#ffd93d',
+    interactRange: 80,
+    stationary: true,
+    dialogues: {
+      initial: [
+        "Greetings, young wizard. I am Seraphina, keeper of quests.",
+        "The realm is threatened by powerful bosses in each zone.",
+        "Only by defeating them all can peace be restored.",
+      ],
+      questOffer: [
+        "I have a task for you, if you're brave enough.",
+        "Six mighty bosses terrorize the lands: the Blossom Behemoth in the Meadow,",
+        "the Ancient Treant in the Forest, the Magma Titan in the Volcanic Wastes,",
+        "the Frost Wyrm in the Frozen Expanse, the Crystal Golem in the Crystal Caves,",
+        "and the Void Overlord in the Abyss.",
+        "Defeat them all, and you shall be known as Champion of the Realm!",
+      ],
+      questActive: "Your quest continues. Check your quest log to see your progress.",
+      questComplete: "Incredible! You have defeated all the bosses! You are truly a Champion!",
+      prompt: "Will you accept this quest?",
+    },
+    quest: {
+      id: 'allBosses',
+      name: 'Champion of the Realm',
+      description: 'Defeat all 6 zone bosses to prove your worth.',
+      reward: { xp: 5000, title: 'Champion' },
+    },
   },
   knight_commander: {
     id: 'knight_commander',
     name: 'Knight Commander Aldric',
     type: 'knight',
-    x: 2500, y: 2900,
+    x: 3650, y: 3100,
     radius: 18,
     zone: 'sanctuary',
     color: '#a8a29e',
     interactRange: 80,
-    stationary: false, // Roams around sanctuary
-    roamRadius: 100,
-    roamSpeed: 30,
+    stationary: true, // Stands guard near southeast
     dialogues: {
       initial: [
         "Halt, wizard. I am Knight Commander Aldric.",
@@ -1380,10 +1409,10 @@ function getZoneAtPosition(x, y) {
   return ZONES.meadow;
 }
 
-// Get random point inside a zone polygon
+// Get random point inside a zone polygon (avoids sanctuary buffer)
 function getRandomPointInZone(zoneId) {
   const zone = ZONES[zoneId];
-  if (!zone || !zone.polygon) return { x: 3000, y: 2500 };
+  if (!zone || !zone.polygon) return { x: 3500, y: 3000 };
   
   // Get bounding box
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1394,11 +1423,15 @@ function getRandomPointInZone(zoneId) {
     maxY = Math.max(maxY, p.y);
   }
   
-  // Try to find a point inside polygon
-  for (let i = 0; i < 50; i++) {
+  // Try to find a point inside polygon that's not too close to sanctuary
+  for (let i = 0; i < 100; i++) {
     const x = minX + Math.random() * (maxX - minX);
     const y = minY + Math.random() * (maxY - minY);
     if (pointInPolygon(x, y, zone.polygon)) {
+      // Skip if too close to sanctuary (except for sanctuary itself)
+      if (zoneId !== 'sanctuary' && isTooCloseToSanctuary(x, y)) {
+        continue;
+      }
       return { x, y };
     }
   }
@@ -1507,6 +1540,335 @@ app.get('/leaderboard', (req, res) => {
       kills: p.kills || 0,
     }));
   res.json(leaders);
+});
+
+// ===========================================
+// AUTHENTICATION SYSTEM
+// ===========================================
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+// Users database (separate from player characters)
+const usersDb = {};
+const sessionsDb = {};
+
+// Generate session token
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Save user to Firebase
+async function saveUserToDb(user) {
+  if (db) {
+    try {
+      await db.collection('spellBrigadeUsers').doc(user.id).set(user, { merge: true });
+    } catch (err) {
+      console.error('Firebase user save error:', err.message);
+    }
+  }
+  usersDb[user.id] = user;
+}
+
+// Load user from Firebase
+async function loadUserFromDb(id) {
+  if (usersDb[id]) return usersDb[id];
+  if (db) {
+    try {
+      const doc = await db.collection('spellBrigadeUsers').doc(id).get();
+      if (doc.exists) {
+        usersDb[id] = doc.data();
+        return usersDb[id];
+      }
+    } catch (err) {
+      console.error('Firebase user load error:', err.message);
+    }
+  }
+  return null;
+}
+
+// Find user by username
+async function findUserByUsername(username) {
+  const lowerUsername = username.toLowerCase();
+  // Check cache first
+  const cached = Object.values(usersDb).find(u => u.username?.toLowerCase() === lowerUsername);
+  if (cached) return cached;
+  
+  // Check Firebase
+  if (db) {
+    try {
+      const snapshot = await db.collection('spellBrigadeUsers')
+        .where('usernameLower', '==', lowerUsername)
+        .limit(1)
+        .get();
+      if (!snapshot.empty) {
+        const user = snapshot.docs[0].data();
+        usersDb[user.id] = user;
+        return user;
+      }
+    } catch (err) {
+      console.error('Firebase user search error:', err.message);
+    }
+  }
+  return null;
+}
+
+// Signup endpoint
+app.post('/auth/signup', async (req, res) => {
+  const { username, password } = req.body;
+  
+  // Validate input
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  if (username.length < 3 || username.length > 20) {
+    return res.status(400).json({ error: 'Username must be 3-20 characters' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return res.status(400).json({ error: 'Username can only contain letters, numbers, and underscores' });
+  }
+  
+  // Check if username already exists
+  const existing = await findUserByUsername(username);
+  if (existing) {
+    return res.status(400).json({ error: 'Username already taken' });
+  }
+  
+  // Hash password
+  const passwordHash = await bcrypt.hash(password, 10);
+  
+  // Create user
+  const userId = 'user_' + crypto.randomBytes(8).toString('hex');
+  const user = {
+    id: userId,
+    username: username,
+    usernameLower: username.toLowerCase(),
+    passwordHash: passwordHash,
+    createdAt: new Date().toISOString(),
+    characters: [], // Array of character IDs
+    settings: {
+      soundEnabled: true,
+      musicEnabled: true,
+      selectedTitle: null,
+    },
+    titles: ['Novice'], // Unlocked titles
+    quests: {
+      allBosses: { active: true, progress: {}, completed: false },
+      dragonSlayer: { active: false, completed: false },
+    },
+  };
+  
+  await saveUserToDb(user);
+  
+  // Generate session
+  const sessionToken = generateSessionToken();
+  sessionsDb[sessionToken] = { userId: user.id, createdAt: Date.now() };
+  
+  console.log(`📝 New user registered: ${username}`);
+  
+  res.json({
+    success: true,
+    sessionToken,
+    user: {
+      id: user.id,
+      username: user.username,
+      characters: user.characters,
+      settings: user.settings,
+      titles: user.titles,
+      quests: user.quests,
+    },
+  });
+});
+
+// Login endpoint
+app.post('/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  
+  const user = await findUserByUsername(username);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+  
+  const validPassword = await bcrypt.compare(password, user.passwordHash);
+  if (!validPassword) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+  
+  // Generate session
+  const sessionToken = generateSessionToken();
+  sessionsDb[sessionToken] = { userId: user.id, createdAt: Date.now() };
+  
+  // Load user's characters
+  const characters = [];
+  for (const charId of user.characters || []) {
+    const char = await loadPlayerFromDb(charId);
+    if (char) characters.push(char);
+  }
+  
+  console.log(`🔑 User logged in: ${username}`);
+  
+  res.json({
+    success: true,
+    sessionToken,
+    user: {
+      id: user.id,
+      username: user.username,
+      characters: characters,
+      settings: user.settings,
+      titles: user.titles,
+      quests: user.quests,
+    },
+  });
+});
+
+// Guest play endpoint
+app.post('/auth/guest', (req, res) => {
+  const guestId = 'guest_' + crypto.randomBytes(8).toString('hex');
+  const sessionToken = generateSessionToken();
+  
+  sessionsDb[sessionToken] = { 
+    guestId: guestId, 
+    isGuest: true, 
+    createdAt: Date.now() 
+  };
+  
+  console.log(`👤 Guest session created: ${guestId}`);
+  
+  res.json({
+    success: true,
+    sessionToken,
+    isGuest: true,
+    guestId: guestId,
+  });
+});
+
+// Validate session endpoint
+app.post('/auth/validate', async (req, res) => {
+  const { sessionToken } = req.body;
+  
+  if (!sessionToken || !sessionsDb[sessionToken]) {
+    return res.status(401).json({ valid: false });
+  }
+  
+  const session = sessionsDb[sessionToken];
+  
+  if (session.isGuest) {
+    return res.json({ valid: true, isGuest: true, guestId: session.guestId });
+  }
+  
+  const user = await loadUserFromDb(session.userId);
+  if (!user) {
+    delete sessionsDb[sessionToken];
+    return res.status(401).json({ valid: false });
+  }
+  
+  // Load characters
+  const characters = [];
+  for (const charId of user.characters || []) {
+    const char = await loadPlayerFromDb(charId);
+    if (char) characters.push(char);
+  }
+  
+  res.json({
+    valid: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      characters: characters,
+      settings: user.settings,
+      titles: user.titles,
+      quests: user.quests,
+    },
+  });
+});
+
+// Update user settings
+app.post('/auth/settings', async (req, res) => {
+  const { sessionToken, settings } = req.body;
+  
+  if (!sessionToken || !sessionsDb[sessionToken]) {
+    return res.status(401).json({ error: 'Invalid session' });
+  }
+  
+  const session = sessionsDb[sessionToken];
+  if (session.isGuest) {
+    return res.status(400).json({ error: 'Guests cannot save settings' });
+  }
+  
+  const user = await loadUserFromDb(session.userId);
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+  
+  user.settings = { ...user.settings, ...settings };
+  await saveUserToDb(user);
+  
+  res.json({ success: true, settings: user.settings });
+});
+
+// Update user quests
+app.post('/auth/quests', async (req, res) => {
+  const { sessionToken, quests } = req.body;
+  
+  if (!sessionToken || !sessionsDb[sessionToken]) {
+    return res.status(401).json({ error: 'Invalid session' });
+  }
+  
+  const session = sessionsDb[sessionToken];
+  if (session.isGuest) {
+    return res.json({ success: true }); // Silently accept for guests
+  }
+  
+  const user = await loadUserFromDb(session.userId);
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+  
+  user.quests = { ...user.quests, ...quests };
+  await saveUserToDb(user);
+  
+  res.json({ success: true, quests: user.quests });
+});
+
+// Link character to user account
+app.post('/auth/link-character', async (req, res) => {
+  const { sessionToken, characterId } = req.body;
+  
+  if (!sessionToken || !sessionsDb[sessionToken]) {
+    return res.status(401).json({ error: 'Invalid session' });
+  }
+  
+  const session = sessionsDb[sessionToken];
+  if (session.isGuest) {
+    return res.status(400).json({ error: 'Guests cannot link characters' });
+  }
+  
+  const user = await loadUserFromDb(session.userId);
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+  
+  if (!user.characters.includes(characterId)) {
+    user.characters.push(characterId);
+    await saveUserToDb(user);
+  }
+  
+  res.json({ success: true, characters: user.characters });
+});
+
+// Logout endpoint
+app.post('/auth/logout', (req, res) => {
+  const { sessionToken } = req.body;
+  if (sessionToken && sessionsDb[sessionToken]) {
+    delete sessionsDb[sessionToken];
+  }
+  res.json({ success: true });
 });
 
 // ===========================================
@@ -2379,6 +2741,21 @@ function gameTick() {
       const currentRoom = player.dungeonRoom || 0;
       const lastRoom = player.dungeonRoomCleared || -1;
       
+      // Spawn dragon when entering dragon lair (room 5)
+      if (currentRoom === 5 && !player.dragonSpawned) {
+        player.dragonSpawned = true;
+        spawnDragonBoss();
+        
+        // Announce dragon encounter
+        io.emit('chat', {
+          type: 'system',
+          text: `🐉 ${player.name} has entered the Dragon's Lair! THE INFERNAL DRAGON AWAKENS!`,
+        });
+        
+        // Screen shake for nearby dungeon players
+        io.emit('dragonAwakens', { x: 400, y: 3000 });
+      }
+      
       // Spawn enemies when entering a new room (not entrance or dragon lair)
       if (currentRoom > lastRoom && currentRoom > 0 && currentRoom < 5) {
         player.dungeonRoomCleared = currentRoom;
@@ -2536,16 +2913,24 @@ function gameTick() {
       }
     }
 
-    // Health regen in sanctuary (safe zone)
+    // Health regen in sanctuary (safe zone) + healing fountain bonus
     const playerZone = getZoneAtPosition(player.x, player.y);
     const inSanctuary = playerZone?.id === 'sanctuary';
     
     if (inSanctuary && player.health < player.maxHealth) {
-      // Heal 20 HP per second (faster healing)
-      player.health = Math.min(player.health + 20 * dt, player.maxHealth);
+      // Check if player is in healing fountain (center of sanctuary)
+      const fountain = BUILDINGS.healing_fountain;
+      const distToFountain = distance(player, { x: fountain.x, y: fountain.y });
+      const inFountain = distToFountain < fountain.healingRadius;
+      
+      // Base heal: 20 HP/s, Fountain: 35 HP/s (fountain.healRate + base)
+      const healAmount = inFountain ? (fountain.healRate + 20) : 20;
+      player.health = Math.min(player.health + healAmount * dt, player.maxHealth);
       player.isHealing = true;
+      player.inFountain = inFountain;
     } else {
       player.isHealing = false;
+      player.inFountain = false;
     }
   }
 
@@ -3132,23 +3517,21 @@ function gameTick() {
       enemy.x = clamp(newX, 50, WORLD.width - 50);
       enemy.y = clamp(newY, 50, WORLD.height - 50);
       
-      // Prevent enemies from entering sanctuary during wander
-      if (ZONES.sanctuary?.polygon && pointInPolygon(enemy.x, enemy.y, ZONES.sanctuary.polygon)) {
-        // Push back out of sanctuary
-        const sanctuaryCenter = { x: 3000, y: 2500 };
-        const pushDir = normalize({ x: enemy.x - sanctuaryCenter.x, y: enemy.y - sanctuaryCenter.y });
-        enemy.x += pushDir.x * 50;
-        enemy.y += pushDir.y * 50;
+      // Prevent enemies from getting too close to sanctuary (including buffer)
+      if (isTooCloseToSanctuary(enemy.x, enemy.y)) {
+        // Push back away from sanctuary
+        const pushDir = normalize({ x: enemy.x - SANCTUARY_CENTER.x, y: enemy.y - SANCTUARY_CENTER.y });
+        enemy.x = SANCTUARY_CENTER.x + pushDir.x * (SANCTUARY_RADIUS + SANCTUARY_BUFFER + 20);
+        enemy.y = SANCTUARY_CENTER.y + pushDir.y * (SANCTUARY_RADIUS + SANCTUARY_BUFFER + 20);
         enemy.wanderAngle = Math.atan2(pushDir.y, pushDir.x); // Face away from sanctuary
       }
     }
     
     if (nearestPlayer && nearestDist <= 400) {
-      // Check if we would enter sanctuary - don't chase into safe zone
-      const sanctuaryPoly = ZONES.sanctuary?.polygon;
-      const playerInSanctuary = sanctuaryPoly && pointInPolygon(nearestPlayer.x, nearestPlayer.y, sanctuaryPoly);
+      // Check if we would enter sanctuary buffer - don't chase into safe zone
+      const playerTooClose = isTooCloseToSanctuary(nearestPlayer.x, nearestPlayer.y);
       
-      if (!playerInSanctuary) {
+      if (!playerTooClose) {
         const dir = normalize({ 
           x: nearestPlayer.x - enemy.x, 
           y: nearestPlayer.y - enemy.y 
@@ -3167,8 +3550,8 @@ function gameTick() {
           }
         }
         
-        // Also prevent entering sanctuary
-        if (sanctuaryPoly && pointInPolygon(newX, newY, sanctuaryPoly)) {
+        // Also prevent entering sanctuary buffer
+        if (isTooCloseToSanctuary(newX, newY)) {
           newX = enemy.x;
           newY = enemy.y;
         }
@@ -3637,12 +4020,15 @@ function gameTick() {
         y: Math.round(e.y),
         health: Math.round(e.health),
         maxHealth: e.maxHealth,
+        radius: e.radius || 14,
         facing: e.facing || 'down',
         animFrame: e.animFrame || 0,
         isSlowed: e.slowedUntil > now,
         isFrozen: e.frozenUntil > now,
         isBoss: e.isBoss || false,
+        isMiniBoss: e.isMiniBoss || false,
         behavior: e.behavior,
+        isCharging: e.isCharging || false,
       }));
     
     const nearbyProjectiles = [...gameState.projectiles.values()]
@@ -4262,6 +4648,17 @@ io.on('connection', (socket) => {
         player.x = sanctuaryCenter.x;
         player.y = sanctuaryCenter.y;
         player.state = 'idle';
+        
+        // Clear dungeon state on respawn
+        if (player.inDungeon) {
+          player.inDungeon = false;
+          player.dungeonProgress = 0;
+          player.dungeonRoom = 0;
+          player.dungeonRoomCleared = -1;
+          player.dragonSpawned = false;
+          socket.emit('exitedDungeon', { x: player.x, y: player.y });
+        }
+        
         socket.emit('respawned', { health: player.health });
         break;
       }
@@ -4873,6 +5270,42 @@ io.on('connection', (socket) => {
             playerLevel: player.level,
             recommendedLevel: 30,
           });
+        } else if (npc.type === 'quest_master') {
+          // Quest Master Seraphina - quest giver
+          const bossKills = player.bossKills || {};
+          const defeatedCount = Object.keys(bossKills).length;
+          
+          if (defeatedCount >= 6) {
+            // Quest complete
+            socket.emit('npcDialogue', {
+              npcId: npc.id,
+              npcName: npc.name,
+              npcType: npc.type,
+              dialogue: [npc.dialogues.questComplete],
+              hasChoice: false,
+            });
+          } else if (player.questActive) {
+            // Quest already active
+            socket.emit('npcDialogue', {
+              npcId: npc.id,
+              npcName: npc.name,
+              npcType: npc.type,
+              dialogue: [npc.dialogues.questActive],
+              followUp: [`Progress: ${defeatedCount}/6 bosses defeated`],
+              hasChoice: false,
+            });
+          } else {
+            // Offer quest
+            socket.emit('npcDialogue', {
+              npcId: npc.id,
+              npcName: npc.name,
+              npcType: npc.type,
+              dialogue: npc.dialogues.initial,
+              followUp: npc.dialogues.questOffer,
+              prompt: npc.dialogues.prompt,
+              hasChoice: true,
+            });
+          }
         }
         break;
       }
@@ -4917,11 +5350,10 @@ io.on('connection', (socket) => {
         player.dungeonProgress = 0;
         player.dungeonWaveSpawned = 0;
         player.dungeonRoom = 0; // Track which room they're in
+        player.dungeonRoomCleared = -1; // Reset room progress
+        player.dragonSpawned = false; // Dragon spawns when player reaches lair
         
-        // Spawn dragon boss at the end
-        spawnDragonBoss();
-        
-        // Spawn initial wave of enemies
+        // Spawn initial wave of enemies (NOT dragon - it spawns when reaching lair)
         spawnDungeonEnemies(player);
         
         socket.emit('enteredDungeon', {
