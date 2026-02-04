@@ -1337,6 +1337,45 @@ function onBossDeath(enemy, killer) {
     gameState.bossRespawnTimers.set(zoneId, Date.now() + BOSS_RESPAWN_TIME);
     console.log(`💀 Zone boss defeated: ${enemy.name} in ${zoneId} - respawns in 30 seconds`);
     
+    // Track boss kills for quest progress
+    if (killer) {
+      if (!killer.bossKills) killer.bossKills = {};
+      killer.bossKills[zoneId] = true;
+      
+      // Check if all 5 zone bosses defeated (Quest: Conquer the Realm)
+      const QUEST_BOSSES = ['meadow', 'forest', 'volcanic', 'frozen', 'abyss'];
+      const defeatedCount = QUEST_BOSSES.filter(z => killer.bossKills[z]).length;
+      
+      if (defeatedCount === QUEST_BOSSES.length && !killer.questComplete) {
+        killer.questComplete = true;
+        killer.questReward = 'realm_conqueror';
+        
+        // Grant quest reward: massive XP bonus + special title
+        const rewardXp = 5000;
+        killer.xp += rewardXp;
+        killer.totalXp += rewardXp;
+        
+        const socket = io.sockets.sockets.get(killer.socketId);
+        if (socket) {
+          socket.emit('questComplete', {
+            quest: 'conquer_realm',
+            title: 'Realm Conqueror',
+            reward: 'realm_conqueror',
+            xp: rewardXp,
+          });
+        }
+        
+        // Announce to all players
+        io.emit('chat', {
+          type: 'system',
+          text: `🏆 ${killer.name} has CONQUERED THE REALM! All zone bosses defeated!`,
+        });
+        
+        console.log(`🏆 ${killer.name} completed "Conquer the Realm" quest!`);
+        savePlayerToDb(killer);
+      }
+    }
+    
     // Calculate drops for the killer
     let drops = [];
     if (killer) {
@@ -1564,7 +1603,7 @@ function initZoneBosses() {
 // ===========================================
 // PROJECTILE CREATION
 // ===========================================
-function createProjectile(player, spell, targetX, targetY) {
+function createProjectile(player, spell, targetX, targetY, targetPlayerId = null) {
   // Limit projectiles to prevent lag
   if (gameState.projectiles.size > 300) {
     return null;
@@ -1588,6 +1627,10 @@ function createProjectile(player, spell, targetX, targetY) {
     isHoming = true;
   }
   
+  // Check if this player can hit other players (PvP)
+  const classData = CLASSES[player.class];
+  const canPvP = classData?.canPvP || false;
+  
   const proj = {
     id,
     ownerId: player.id,
@@ -1609,8 +1652,9 @@ function createProjectile(player, spell, targetX, targetY) {
     slowEffect: spell.slowEffect,
     slowDuration: spell.slowDuration,
     targetId: null,
+    targetPlayerId: targetPlayerId, // Track if targeting a specific player
     createdAt: Date.now(),
-    canHitPlayers: spell.canHitPlayers || false,
+    canHitPlayers: canPvP || spell.canHitPlayers || false,
     piercing: spell.piercing || false,
   };
   
@@ -1740,18 +1784,34 @@ function gameTick() {
             // Find target
             let target = null;
             let targetDist = spell.range;
+            let targetIsPlayer = false;
 
+            // Search enemies first
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
               const dist = distance(player, enemy);
               if (dist < targetDist) {
                 targetDist = dist;
                 target = enemy;
+                targetIsPlayer = false;
+              }
+            }
+
+            // Voidlord can also target other players (PvP)
+            if (classData.canPvP) {
+              for (const otherPlayer of gameState.players.values()) {
+                if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
+                const dist = distance(player, otherPlayer);
+                if (dist < targetDist) {
+                  targetDist = dist;
+                  target = otherPlayer;
+                  targetIsPlayer = true;
+                }
               }
             }
 
             if (target) {
-              createProjectile(player, spell, target.x, target.y);
+              createProjectile(player, spell, target.x, target.y, targetIsPlayer ? target.id : null);
               player.lastCast = player.lastCast || {};
               player.lastCast[spellId] = now;
               player.state = 'attack';
@@ -2199,8 +2259,16 @@ function gameTick() {
     }
 
     // Homing behavior
-    if (proj.homing && proj.targetId) {
-      const target = gameState.enemies.get(proj.targetId);
+    if (proj.homing) {
+      let target = null;
+      
+      // Check if targeting a player
+      if (proj.targetPlayerId) {
+        target = gameState.players.get(proj.targetPlayerId);
+      } else if (proj.targetId) {
+        target = gameState.enemies.get(proj.targetId);
+      }
+      
       if (target && target.health > 0) {
         const dir = normalize({ x: target.x - proj.x, y: target.y - proj.y });
         const speed = Math.sqrt(proj.vx ** 2 + proj.vy ** 2);
@@ -2475,85 +2543,26 @@ function gameTick() {
     }
   }
 
-  // --- BROADCAST STATE ---
-  const stateSnapshot = {
-    tick: gameState.tickCount,
-    timestamp: now,
-    players: [...gameState.players.values()].map(p => {
-      // Calculate cooldowns
-      const classData = CLASSES[p.class];
-      const cooldowns = {};
-      if (classData) {
-        for (const spellId of classData.spells) {
-          const spell = SPELLS[spellId];
-          if (spell) {
-            const lastCast = p.lastCast?.[spellId] || 0;
-            const remaining = Math.max(0, spell.cooldown - (now - lastCast));
-            cooldowns[spellId] = {
-              remaining,
-              total: spell.cooldown,
-              ready: remaining === 0,
-            };
-          }
-        }
-        
-        // Add dash cooldown
-        if (classData.dashAbility) {
-          const lastDash = p.lastDash || 0;
-          const dashRemaining = Math.max(0, classData.dashAbility.cooldown - (now - lastDash));
-          cooldowns.dash = {
-            remaining: dashRemaining,
-            total: classData.dashAbility.cooldown,
-            ready: dashRemaining === 0,
-            name: classData.dashAbility.name,
-          };
-        }
-        
-        // Add ultimate cooldown
-        if (classData.ultimateAbility) {
-          const lastUlt = p.lastUltimate || 0;
-          const ultRemaining = Math.max(0, classData.ultimateAbility.cooldown - (now - lastUlt));
-          cooldowns.ultimate = {
-            remaining: ultRemaining,
-            total: classData.ultimateAbility.cooldown,
-            ready: ultRemaining === 0,
-            name: classData.ultimateAbility.name,
-          };
-        }
-      }
-
-      return {
-        id: p.id,
-        name: p.name,
-        class: p.class,
-        x: Math.round(p.x * 10) / 10,
-        y: Math.round(p.y * 10) / 10,
-        health: Math.round(p.health),
-        maxHealth: p.maxHealth,
-        level: p.level,
-        xp: p.xp,
-        totalXp: p.totalXp || 0,
-        xpToLevel: xpForLevel(p.level),
-        kills: p.kills || 0,
-        deaths: p.deaths || 0,
-        state: p.state || 'idle',
-        facing: p.facing || 'down',
-        animFrame: p.animFrame || 0,
-        selectedSkin: p.selectedSkin || `${p.class}_default`,
-        cooldowns,
-        emote: p.emote || null,
-        emoteStart: p.emoteStart || null,
-        isHealing: p.isHealing || false,
-      };
-    }),
-    enemies: [...gameState.enemies.values()]
-      .filter(e => e.health > 0 && (e.revealed !== false)) // Hide unrevealed mimics
+  // --- BROADCAST STATE (Per-player with view distance filtering) ---
+  const VIEW_DISTANCE = 1200;
+  
+  for (const player of gameState.players.values()) {
+    const socket = io.sockets.sockets.get(player.socketId);
+    if (!socket) continue;
+    
+    const px = player.x;
+    const py = player.y;
+    
+    // Filter entities by distance
+    const nearbyEnemies = [...gameState.enemies.values()]
+      .filter(e => e.health > 0 && (e.revealed !== false) && 
+        Math.abs(e.x - px) < VIEW_DISTANCE && Math.abs(e.y - py) < VIEW_DISTANCE)
       .map(e => ({
         id: e.id,
-        type: e.behavior === 'ambush' && !e.revealed ? 'xpOrb' : e.type, // Disguise mimics
+        type: e.behavior === 'ambush' && !e.revealed ? 'xpOrb' : e.type,
         name: e.name,
-        x: Math.round(e.x * 10) / 10,
-        y: Math.round(e.y * 10) / 10,
+        x: Math.round(e.x),
+        y: Math.round(e.y),
         health: Math.round(e.health),
         maxHealth: e.maxHealth,
         facing: e.facing || 'down',
@@ -2562,42 +2571,78 @@ function gameTick() {
         isFrozen: e.frozenUntil > now,
         isBoss: e.isBoss || false,
         behavior: e.behavior,
+      }));
+    
+    const nearbyProjectiles = [...gameState.projectiles.values()]
+      .filter(p => Math.abs(p.x - px) < VIEW_DISTANCE && Math.abs(p.y - py) < VIEW_DISTANCE)
+      .map(p => ({
+        id: p.id, x: Math.round(p.x), y: Math.round(p.y),
+        radius: p.radius, color: p.color, trailColor: p.trailColor,
+        spellId: p.spellId, ownerClass: p.ownerClass, level: p.ownerLevel || 1,
+      }));
+    
+    const nearbyOrbs = [...gameState.xpOrbs.values()]
+      .filter(o => Math.abs(o.x - px) < VIEW_DISTANCE && Math.abs(o.y - py) < VIEW_DISTANCE)
+      .map(o => ({ id: o.id, x: Math.round(o.x), y: Math.round(o.y), amount: o.amount }));
+    
+    const nearbyParticles = gameState.particles
+      .filter(p => Math.abs(p.x - px) < VIEW_DISTANCE && Math.abs(p.y - py) < VIEW_DISTANCE)
+      .slice(0, 80)
+      .map(p => ({
+        x: Math.round(p.x), y: Math.round(p.y), color: p.color,
+        radius: p.radius, alpha: 1 - (now - p.createdAt) / p.lifetime,
+      }));
+    
+    const nearbyDmgNums = gameState.damageNumbers
+      .filter(d => Math.abs(d.x - px) < VIEW_DISTANCE && Math.abs(d.y - py) < VIEW_DISTANCE)
+      .slice(0, 25)
+      .map(d => ({
+        x: d.x, y: d.y - ((now - d.createdAt) / d.lifetime) * 30,
+        amount: d.amount, isCrit: d.isCrit, alpha: 1 - (now - d.createdAt) / d.lifetime,
+      }));
+    
+    // Cooldowns for this player
+    const classData = CLASSES[player.class];
+    const cooldowns = {};
+    if (classData) {
+      for (const spellId of classData.spells) {
+        const spell = SPELLS[spellId];
+        if (spell) {
+          const lastCast = player.lastCast?.[spellId] || 0;
+          cooldowns[spellId] = { remaining: Math.max(0, spell.cooldown - (now - lastCast)), total: spell.cooldown };
+        }
+      }
+      if (classData.dashAbility) {
+        cooldowns.dash = { remaining: Math.max(0, classData.dashAbility.cooldown - (now - (player.lastDash || 0))), total: classData.dashAbility.cooldown };
+      }
+      if (classData.ultimateAbility) {
+        cooldowns.ultimate = { remaining: Math.max(0, classData.ultimateAbility.cooldown - (now - (player.lastUltimate || 0))), total: classData.ultimateAbility.cooldown };
+      }
+    }
+    
+    socket.emit('gameState', {
+      tick: gameState.tickCount,
+      timestamp: now,
+      players: [...gameState.players.values()].map(p => ({
+        id: p.id, name: p.name, class: p.class,
+        x: Math.round(p.x), y: Math.round(p.y),
+        health: Math.round(p.health), maxHealth: p.maxHealth,
+        level: p.level, xp: p.xp, totalXp: p.totalXp || 0, xpToLevel: xpForLevel(p.level),
+        kills: p.kills || 0, deaths: p.deaths || 0,
+        state: p.state || 'idle', facing: p.facing || 'down', animFrame: p.animFrame || 0,
+        selectedSkin: p.selectedSkin || `${p.class}_default`,
+        cooldowns: p.id === player.id ? cooldowns : {},
+        emote: p.emote || null, emoteStart: p.emoteStart || null,
+        isHealing: p.isHealing || false,
+        bossKills: p.bossKills || {},
       })),
-    projectiles: [...gameState.projectiles.values()].map(p => ({
-      id: p.id,
-      x: Math.round(p.x * 10) / 10,
-      y: Math.round(p.y * 10) / 10,
-      radius: p.radius,
-      color: p.color,
-      trailColor: p.trailColor,
-      spellId: p.spellId,
-      ownerClass: p.ownerClass,
-      level: p.ownerLevel || 1,
-    })),
-    xpOrbs: [...gameState.xpOrbs.values()].map(o => ({
-      id: o.id,
-      x: Math.round(o.x * 10) / 10,
-      y: Math.round(o.y * 10) / 10,
-      amount: o.amount,
-    })),
-    particles: gameState.particles.map(p => ({
-      x: Math.round(p.x),
-      y: Math.round(p.y),
-      color: p.color,
-      radius: p.radius,
-      alpha: 1 - (now - p.createdAt) / p.lifetime,
-    })),
-    damageNumbers: gameState.damageNumbers.map(d => ({
-      x: d.x,
-      y: d.y - ((now - d.createdAt) / d.lifetime) * 30, // Float upward
-      amount: d.amount,
-      isCrit: d.isCrit,
-      alpha: 1 - (now - d.createdAt) / d.lifetime,
-    })),
-    // Static data removed - sent once on connect instead
-  };
-
-  io.emit('gameState', stateSnapshot);
+      enemies: nearbyEnemies,
+      projectiles: nearbyProjectiles,
+      xpOrbs: nearbyOrbs,
+      particles: nearbyParticles,
+      damageNumbers: nearbyDmgNums,
+    });
+  }
 }
 
 function checkEnemyDeath(enemy, killerId) {
