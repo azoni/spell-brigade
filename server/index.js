@@ -69,14 +69,33 @@ const ZONES = {
     // Center point and radius for backward compatibility
     x: 3000,
     y: 2500,
-    radius: 250,
+    radius: 350,
     polygon: [
-      { x: 2800, y: 2300 },
-      { x: 3200, y: 2300 },
-      { x: 3400, y: 2500 },
-      { x: 3200, y: 2700 },
-      { x: 2800, y: 2700 },
-      { x: 2600, y: 2500 },
+      { x: 2650, y: 2150 },
+      { x: 3350, y: 2150 },
+      { x: 3550, y: 2500 },
+      { x: 3350, y: 2850 },
+      { x: 2650, y: 2850 },
+      { x: 2450, y: 2500 },
+    ],
+  },
+  dungeon: {
+    id: 'dungeon',
+    name: "Dragon's Gauntlet",
+    description: 'A treacherous dungeon. Only the strongest survive.',
+    color: '#991b1b',
+    isSafe: false,
+    enemyLevel: 30,
+    enemyTypes: ['dungeon_skeleton', 'dungeon_wraith', 'dungeon_golem', 'dungeon_demon'],
+    xpMultiplier: 5.0,
+    recommendedLevel: 30,
+    isDungeon: true,
+    // Linear corridor dungeon - separate instance
+    polygon: [
+      { x: 100, y: 100 },
+      { x: 800, y: 100 },
+      { x: 800, y: 4900 },
+      { x: 100, y: 4900 },
     ],
   },
   meadow: {
@@ -319,7 +338,77 @@ const BUILDINGS = {
     color: '#ec4899',
     interactable: true,
   },
+  // Sanctuary Campfire
+  campfire: {
+    id: 'campfire',
+    name: 'Campfire',
+    x: 2850, y: 2600,
+    width: 40, height: 40,
+    zone: 'sanctuary',
+    color: '#f97316',
+    interactable: false,
+    isDecoration: true,
+  },
 };
+
+// ===========================================
+// NPCs
+// ===========================================
+const NPCS = {
+  ethereal_guide: {
+    id: 'ethereal_guide',
+    name: 'Ethereal Guide',
+    type: 'guide',
+    x: 3100, y: 2400,
+    radius: 20,
+    zone: 'sanctuary',
+    color: '#67e8f9',
+    interactRange: 80,
+    stationary: true,
+    greetings: [
+      "Welcome, traveler. The realm awaits your courage.",
+      "Ah, another brave soul. May the arcane guide your path.",
+      "Greetings, wizard. The sanctuary protects all who seek refuge.",
+      "The world beyond grows dark. Prepare yourself well.",
+      "I have watched countless heroes pass through. Will you be different?",
+      "The bosses of each zone guard ancient power. Defeat them all to prove your worth.",
+      "Sanctuary heals all wounds. Rest here before venturing forth.",
+      "The path to mastery is long. Take it one step at a time.",
+    ],
+  },
+  knight_commander: {
+    id: 'knight_commander',
+    name: 'Knight Commander Aldric',
+    type: 'knight',
+    x: 2900, y: 2550,
+    radius: 18,
+    zone: 'sanctuary',
+    color: '#a8a29e',
+    interactRange: 80,
+    stationary: false, // Roams around sanctuary
+    roamRadius: 100,
+    roamSpeed: 30,
+    dialogues: {
+      initial: [
+        "Halt, wizard. I am Knight Commander Aldric.",
+        "I guard the passage to the Dragon's Gauntlet - a dungeon of unspeakable danger.",
+        "Many have entered. Few have returned.",
+      ],
+      warning: [
+        "You seek to challenge the Infernal Dragon?",
+        "I would advise reaching at least level 30 before attempting such folly.",
+        "The creatures within grow stronger the deeper you venture.",
+        "At the end awaits the dragon itself... a beast of nightmares.",
+      ],
+      prompt: "Do you wish to enter the Dragon's Gauntlet?",
+      tooWeak: "You are not ready. Return when you have grown stronger. (Recommended: Level 30)",
+      enter: "Very well. May your flames burn bright, wizard. Step through when ready.",
+    },
+  },
+};
+
+// NPC State tracking
+const npcStates = new Map();
 
 // ===========================================
 // SKINS SYSTEM
@@ -813,6 +902,74 @@ const ENEMY_TYPES = {
     attackCooldown: 3500,
     attackType: 'crystal_barrage', // Shoots crystal shards
   },
+  // DUNGEON ENEMIES - Dragon's Gauntlet
+  dungeon_skeleton: {
+    id: 'dungeon_skeleton',
+    name: 'Cursed Knight',
+    health: 200,
+    damage: 35,
+    speed: 60,
+    radius: 18,
+    xp: 80,
+    color: '#44403c',
+    behavior: 'chase',
+    isDungeon: true,
+  },
+  dungeon_wraith: {
+    id: 'dungeon_wraith',
+    name: 'Soul Wraith',
+    health: 150,
+    damage: 45,
+    speed: 85,
+    radius: 16,
+    xp: 100,
+    color: '#3730a3',
+    behavior: 'phase',
+    isDungeon: true,
+  },
+  dungeon_golem: {
+    id: 'dungeon_golem',
+    name: 'Obsidian Guardian',
+    health: 400,
+    damage: 50,
+    speed: 35,
+    radius: 28,
+    xp: 150,
+    color: '#1c1917',
+    behavior: 'chase',
+    isDungeon: true,
+  },
+  dungeon_demon: {
+    id: 'dungeon_demon',
+    name: 'Infernal Demon',
+    health: 300,
+    damage: 60,
+    speed: 70,
+    radius: 22,
+    xp: 200,
+    color: '#7f1d1d',
+    behavior: 'chase',
+    isDungeon: true,
+    attackCooldown: 3000,
+    attackType: 'demon_fire', // Shoots fireballs
+  },
+  // DRAGON BOSS - Final boss of dungeon
+  boss_dragon: {
+    id: 'boss_dragon',
+    name: 'Infernal Dragon',
+    health: 10000,
+    damage: 80,
+    speed: 40,
+    radius: 80,
+    xp: 5000,
+    color: '#b91c1c',
+    behavior: 'boss_dragon',
+    isBoss: true,
+    isDungeon: true,
+    zone: 'dungeon',
+    attackCooldown: 2000,
+    attacks: ['flame_breath', 'wing_gust', 'tail_swipe', 'summon_minions', 'rage_mode'],
+  },
 };
 
 // ===========================================
@@ -975,9 +1132,26 @@ const gameState = {
   chatMessages: [],        // Chat history (last 50 messages)
   zoneBosses: new Map(),   // Zone boss tracking (zoneId -> enemyId)
   bossRespawnTimers: new Map(), // Zone -> respawn timestamp
+  npcs: new Map(),         // NPCs (id -> npc state)
+  dungeonInstances: new Map(), // Player dungeon instances
   lastTick: Date.now(),
   tickCount: 0,
 };
+
+// Initialize NPCs
+function initNpcs() {
+  for (const [id, npc] of Object.entries(NPCS)) {
+    gameState.npcs.set(id, {
+      ...npc,
+      currentX: npc.x,
+      currentY: npc.y,
+      facing: 'down',
+      wanderAngle: Math.random() * Math.PI * 2,
+      lastWander: Date.now(),
+    });
+  }
+  console.log(`✨ Initialized ${gameState.npcs.size} NPCs`);
+}
 
 // Zone boss types (which boss for each zone)
 const ZONE_BOSS_TYPES = {
@@ -1604,6 +1778,97 @@ function initZoneBosses() {
 }
 
 // ===========================================
+// DUNGEON SPAWNING
+// ===========================================
+// Dungeon enemies spawn when player enters, based on their depth
+// Enemies get stronger the deeper into the dungeon
+
+function spawnDungeonEnemies(player) {
+  // Spawn enemies in front of player based on progress
+  const dungeonEnemies = ['dungeon_skeleton', 'dungeon_wraith', 'dungeon_golem', 'dungeon_demon'];
+  const baseY = player.y + 200;
+  
+  // Spawn a wave of enemies
+  const numEnemies = Math.min(5, 2 + Math.floor(player.y / 1000)); // More enemies deeper in
+  const depthMultiplier = 1 + (player.y / 5000) * 2; // Up to 3x at end
+  
+  for (let i = 0; i < numEnemies; i++) {
+    const type = dungeonEnemies[Math.floor(Math.random() * dungeonEnemies.length)];
+    const template = ENEMY_TYPES[type];
+    if (!template) continue;
+    
+    const x = 250 + (i - numEnemies/2) * 80 + Math.random() * 50;
+    const y = baseY + Math.random() * 100;
+    
+    // Don't spawn past dragon
+    if (y > 4400) continue;
+    
+    const enemy = {
+      id: uuidv4(),
+      type: type,
+      name: template.name,
+      health: Math.round(template.health * depthMultiplier),
+      maxHealth: Math.round(template.health * depthMultiplier),
+      baseSpeed: template.speed,
+      damage: Math.round(template.damage * depthMultiplier),
+      radius: template.radius,
+      xp: Math.round(template.xp * depthMultiplier),
+      color: template.color,
+      behavior: template.behavior,
+      x,
+      y,
+      zone: 'dungeon',
+      isDungeon: true,
+      facing: 'up',
+      animFrame: 0,
+      slowedUntil: 0,
+      frozenUntil: 0,
+    };
+    
+    gameState.enemies.set(enemy.id, enemy);
+  }
+}
+
+function spawnDragonBoss() {
+  const template = ENEMY_TYPES.boss_dragon;
+  if (!template) return;
+  
+  // Check if dragon already exists
+  for (const enemy of gameState.enemies.values()) {
+    if (enemy.type === 'boss_dragon') return;
+  }
+  
+  const dragon = {
+    id: uuidv4(),
+    type: 'boss_dragon',
+    name: template.name,
+    health: template.health,
+    maxHealth: template.health,
+    baseSpeed: template.speed,
+    damage: template.damage,
+    radius: template.radius,
+    xp: template.xp,
+    color: template.color,
+    behavior: 'boss_dragon',
+    isBoss: true,
+    isDungeon: true,
+    x: 450,
+    y: 4600,
+    zone: 'dungeon',
+    facing: 'up',
+    animFrame: 0,
+    slowedUntil: 0,
+    frozenUntil: 0,
+    lastAbility: 0,
+    phase: 1, // Dragon has multiple phases
+    attackPattern: 0,
+  };
+  
+  gameState.enemies.set(dragon.id, dragon);
+  console.log('🐉 Dragon boss spawned!');
+}
+
+// ===========================================
 // PROJECTILE CREATION
 // ===========================================
 function createProjectile(player, spell, targetX, targetY, targetPlayerId = null) {
@@ -2090,6 +2355,164 @@ function gameTick() {
         }
       }
     }
+    
+    // ========== DRAGON BOSS ATTACKS ==========
+    if (enemy.type === 'boss_dragon' && nearestPlayer) {
+      const attackCooldown = 2000 - (enemy.phase || 1) * 200; // Faster in higher phases
+      
+      if (now - (enemy.lastAbility || 0) > attackCooldown) {
+        enemy.lastAbility = now;
+        
+        // Cycle through attacks
+        enemy.attackPattern = ((enemy.attackPattern || 0) + 1) % 5;
+        const attack = enemy.attackPattern;
+        
+        // Phase 2 at 50% health, Phase 3 at 25%
+        if (enemy.health < enemy.maxHealth * 0.25) {
+          enemy.phase = 3;
+        } else if (enemy.health < enemy.maxHealth * 0.5) {
+          enemy.phase = 2;
+        }
+        
+        if (attack === 0) {
+          // FLAME BREATH - Cone of fire toward player
+          const dir = normalize({ x: nearestPlayer.x - enemy.x, y: nearestPlayer.y - enemy.y });
+          const coneAngle = Math.PI / 3; // 60 degree cone
+          const coneRange = 300;
+          const baseAngle = Math.atan2(dir.y, dir.x);
+          
+          // Warning
+          io.emit('dragonBreath', { 
+            x: enemy.x, y: enemy.y, 
+            angle: baseAngle, 
+            range: coneRange,
+            color: '#f97316',
+          });
+          
+          // Damage after short delay
+          setTimeout(() => {
+            for (const player of gameState.players.values()) {
+              if (player.health <= 0 || !player.inDungeon) continue;
+              const toPlayer = { x: player.x - enemy.x, y: player.y - enemy.y };
+              const playerDist = Math.sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+              
+              if (playerDist < coneRange) {
+                const playerAngle = Math.atan2(toPlayer.y, toPlayer.x);
+                let angleDiff = Math.abs(playerAngle - baseAngle);
+                if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                
+                if (angleDiff < coneAngle / 2) {
+                  player.health -= 50 + (enemy.phase - 1) * 15;
+                  io.to(player.socketId).emit('damaged', { amount: 50, fromX: enemy.x, fromY: enemy.y });
+                  spawnDamageNumber(player.x, player.y - 20, 50);
+                  if (player.health <= 0) {
+                    player.health = 0;
+                    player.deaths = (player.deaths || 0) + 1;
+                    io.to(player.socketId).emit('died', { killedBy: 'Infernal Dragon', deathMessage: 'Consumed by dragon fire!' });
+                  }
+                }
+              }
+            }
+          }, 500);
+          
+        } else if (attack === 1) {
+          // WING GUST - Pushes players back
+          io.emit('dragonWingGust', { x: enemy.x, y: enemy.y, radius: 250 });
+          
+          for (const player of gameState.players.values()) {
+            if (player.health <= 0 || !player.inDungeon) continue;
+            const dist = distance(enemy, player);
+            if (dist < 250) {
+              const pushDir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
+              player.x += pushDir.x * 100;
+              player.y = Math.max(100, Math.min(4800, player.y + pushDir.y * 100));
+              player.x = clamp(player.x, 150, 750);
+            }
+          }
+          
+        } else if (attack === 2) {
+          // TAIL SWIPE - Close range damage
+          io.emit('dragonTailSwipe', { x: enemy.x, y: enemy.y, radius: 150 });
+          
+          for (const player of gameState.players.values()) {
+            if (player.health <= 0 || !player.inDungeon) continue;
+            if (distance(enemy, player) < 150) {
+              player.health -= 40 + (enemy.phase - 1) * 10;
+              io.to(player.socketId).emit('damaged', { amount: 40, fromX: enemy.x, fromY: enemy.y });
+              spawnDamageNumber(player.x, player.y - 20, 40);
+              if (player.health <= 0) {
+                player.health = 0;
+                player.deaths = (player.deaths || 0) + 1;
+                io.to(player.socketId).emit('died', { killedBy: 'Infernal Dragon', deathMessage: 'Crushed by the dragon\'s tail!' });
+              }
+            }
+          }
+          
+        } else if (attack === 3 && enemy.phase >= 2) {
+          // SUMMON MINIONS (Phase 2+)
+          for (let i = 0; i < 2 + enemy.phase; i++) {
+            const minionX = enemy.x + (Math.random() - 0.5) * 200;
+            const minionY = enemy.y - 100 - Math.random() * 100;
+            
+            const minion = {
+              id: uuidv4(),
+              type: 'dungeon_skeleton',
+              name: 'Dragon Spawn',
+              health: 100,
+              maxHealth: 100,
+              baseSpeed: 80,
+              damage: 25,
+              radius: 14,
+              xp: 30,
+              color: '#7f1d1d',
+              behavior: 'chase',
+              x: minionX,
+              y: minionY,
+              zone: 'dungeon',
+              isDungeon: true,
+              facing: 'up',
+              animFrame: 0,
+              slowedUntil: 0,
+              frozenUntil: 0,
+            };
+            gameState.enemies.set(minion.id, minion);
+          }
+          io.emit('sound', { type: 'summon', x: enemy.x, y: enemy.y });
+          spawnParticles(enemy.x, enemy.y, '#7f1d1d', 20);
+          
+        } else if (attack === 4 && enemy.phase >= 3) {
+          // RAGE MODE (Phase 3) - Fire everywhere
+          io.emit('dragonRage', { x: enemy.x, y: enemy.y });
+          
+          // Multiple fire projectiles in all directions
+          for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const proj = {
+              id: uuidv4(),
+              ownerId: enemy.id,
+              ownerClass: 'dragon',
+              spellId: 'dragon_fire',
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(angle) * 200,
+              vy: Math.sin(angle) * 200,
+              damage: 30,
+              radius: 15,
+              color: '#f97316',
+              trailColor: '#fbbf24',
+              maxRange: 400,
+              traveled: 0,
+              createdAt: now,
+              canHitPlayers: true,
+              isDragonFire: true,
+            };
+            gameState.projectiles.set(proj.id, proj);
+          }
+        }
+        
+        io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+      }
+    }
     // ========== END BOSS ATTACKS ==========
 
     // Wander if no player nearby (keeps enemies moving within zone)
@@ -2547,6 +2970,49 @@ function gameTick() {
     }
   }
 
+  // --- UPDATE NPCs ---
+  for (const [id, npc] of gameState.npcs) {
+    // Roaming NPCs (like knight)
+    if (!npc.stationary && npc.roamRadius) {
+      const timeSinceWander = now - (npc.lastWander || 0);
+      
+      // Change direction occasionally
+      if (timeSinceWander > 2000 + Math.random() * 3000) {
+        npc.wanderAngle = Math.random() * Math.PI * 2;
+        npc.lastWander = now;
+      }
+      
+      // Move
+      const speed = npc.roamSpeed || 30;
+      let newX = npc.currentX + Math.cos(npc.wanderAngle) * speed * dt;
+      let newY = npc.currentY + Math.sin(npc.wanderAngle) * speed * dt;
+      
+      // Stay within roam radius of home position
+      const distFromHome = Math.sqrt(
+        Math.pow(newX - npc.x, 2) + Math.pow(newY - npc.y, 2)
+      );
+      
+      if (distFromHome > npc.roamRadius) {
+        // Turn back toward home
+        npc.wanderAngle = Math.atan2(npc.y - npc.currentY, npc.x - npc.currentX);
+        newX = npc.currentX;
+        newY = npc.currentY;
+      }
+      
+      npc.currentX = newX;
+      npc.currentY = newY;
+      
+      // Update facing
+      const vx = Math.cos(npc.wanderAngle);
+      const vy = Math.sin(npc.wanderAngle);
+      if (Math.abs(vx) > Math.abs(vy)) {
+        npc.facing = vx > 0 ? 'right' : 'left';
+      } else {
+        npc.facing = vy > 0 ? 'down' : 'up';
+      }
+    }
+  }
+
   // --- BROADCAST STATE (Per-player with view distance filtering) ---
   const VIEW_DISTANCE = 1200;
   
@@ -2624,6 +3090,21 @@ function gameTick() {
       }
     }
     
+    // Get nearby NPCs
+    const nearbyNpcs = [...gameState.npcs.values()]
+      .filter(npc => Math.abs(npc.currentX - px) < VIEW_DISTANCE && Math.abs(npc.currentY - py) < VIEW_DISTANCE)
+      .map(npc => ({
+        id: npc.id,
+        name: npc.name,
+        type: npc.type,
+        x: Math.round(npc.currentX),
+        y: Math.round(npc.currentY),
+        color: npc.color,
+        facing: npc.facing || 'down',
+        interactRange: npc.interactRange,
+        stationary: npc.stationary,
+      }));
+    
     socket.emit('gameState', {
       tick: gameState.tickCount,
       timestamp: now,
@@ -2645,6 +3126,7 @@ function gameTick() {
       xpOrbs: nearbyOrbs,
       particles: nearbyParticles,
       damageNumbers: nearbyDmgNums,
+      npcs: nearbyNpcs,
     });
   }
 }
@@ -2716,6 +3198,10 @@ setInterval(gameTick, TICK_INTERVAL);
 // Initialize zone bosses
 initZoneBosses();
 console.log('👑 Zone bosses initialized');
+
+// Initialize NPCs
+initNpcs();
+console.log('🧙 NPCs initialized');
 
 // ===========================================
 // SOCKET.IO EVENTS
@@ -3378,6 +3864,133 @@ io.on('connection', (socket) => {
           socket.emit('pvpToggled', { enabled: player.pvpEnabled === true });
           console.log(`👹 ${player.name} PvP: ${player.pvpEnabled ? 'ON' : 'OFF'}`);
         }
+        break;
+      }
+    }
+  });
+
+  // NPC Interaction
+  socket.on('interactNpc', ({ npcId }) => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        const npc = gameState.npcs.get(npcId);
+        if (!npc) {
+          socket.emit('npcError', { message: 'NPC not found' });
+          return;
+        }
+        
+        // Check distance
+        const dist = Math.sqrt(
+          Math.pow(player.x - npc.currentX, 2) + 
+          Math.pow(player.y - npc.currentY, 2)
+        );
+        
+        if (dist > npc.interactRange + 20) {
+          socket.emit('npcError', { message: 'Too far away' });
+          return;
+        }
+        
+        // Handle different NPC types
+        if (npc.type === 'guide') {
+          // Ethereal Guide - random greeting
+          const greeting = npc.greetings[Math.floor(Math.random() * npc.greetings.length)];
+          socket.emit('npcDialogue', {
+            npcId: npc.id,
+            npcName: npc.name,
+            npcType: npc.type,
+            dialogue: [greeting],
+            hasChoice: false,
+          });
+        } else if (npc.type === 'knight') {
+          // Knight Commander - dungeon entrance
+          socket.emit('npcDialogue', {
+            npcId: npc.id,
+            npcName: npc.name,
+            npcType: npc.type,
+            dialogue: npc.dialogues.initial,
+            followUp: npc.dialogues.warning,
+            prompt: npc.dialogues.prompt,
+            hasChoice: true,
+            playerLevel: player.level,
+            recommendedLevel: 30,
+          });
+        }
+        break;
+      }
+    }
+  });
+
+  // Enter Dungeon
+  socket.on('enterDungeon', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        const knight = gameState.npcs.get('knight_commander');
+        if (!knight) return;
+        
+        // Check distance from knight
+        const dist = Math.sqrt(
+          Math.pow(player.x - knight.currentX, 2) + 
+          Math.pow(player.y - knight.currentY, 2)
+        );
+        
+        if (dist > knight.interactRange + 50) {
+          socket.emit('npcError', { message: 'Return to Knight Commander Aldric to enter' });
+          return;
+        }
+        
+        // Level check (warning only, still allow entry)
+        if (player.level < 30) {
+          socket.emit('dungeonWarning', { 
+            message: "The Knight warned you... but you enter anyway.",
+            recommendedLevel: 30,
+            playerLevel: player.level,
+          });
+        }
+        
+        // Transport to dungeon
+        player.x = 450;  // Center of dungeon corridor
+        player.y = 200;  // Near entrance
+        player.inDungeon = true;
+        player.dungeonProgress = 0;
+        player.dungeonWaveSpawned = 0;
+        
+        // Spawn dragon boss at the end
+        spawnDragonBoss();
+        
+        // Spawn initial wave of enemies
+        spawnDungeonEnemies(player);
+        
+        socket.emit('enteredDungeon', {
+          x: player.x,
+          y: player.y,
+          zone: 'dungeon',
+        });
+        
+        console.log(`⚔️ ${player.name} entered the Dragon's Gauntlet!`);
+        
+        // Broadcast to others
+        io.emit('chat', {
+          type: 'system',
+          text: `⚔️ ${player.name} has entered the Dragon's Gauntlet!`,
+        });
+        break;
+      }
+    }
+  });
+
+  // Exit Dungeon (return to sanctuary)
+  socket.on('exitDungeon', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id && player.inDungeon) {
+        player.x = 3000;
+        player.y = 2500;
+        player.inDungeon = false;
+        player.dungeonProgress = 0;
+        
+        socket.emit('exitedDungeon', {
+          x: player.x,
+          y: player.y,
+        });
         break;
       }
     }
