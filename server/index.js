@@ -1688,7 +1688,7 @@ function gameTick() {
     if (!player.portalCooldown || now > player.portalCooldown) {
       for (const [portalId, portal] of Object.entries(PORTALS)) {
         const distToPortal = distance(player, portal.from);
-        if (distToPortal < 45) {
+        if (distToPortal < 80) {  // Larger detection radius for easier entry
           // Check level requirement
           if (player.level >= portal.requiredLevel) {
             // Teleport!
@@ -3168,6 +3168,24 @@ io.on('connection', (socket) => {
             player.emoteStart = null;
           }
         }, 3000);
+        break;
+      }
+    }
+  });
+
+  // Recall to Sanctuary (B key)
+  socket.on('recall', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id && player.health > 0) {
+        // Teleport to sanctuary center
+        player.x = 3000;
+        player.y = 2500;
+        
+        // Notify client
+        socket.emit('recalled', { x: 3000, y: 2500 });
+        
+        // Visual effect at both locations
+        io.emit('sound', { type: 'portalEnter', x: player.x, y: player.y });
         break;
       }
     }
