@@ -2649,6 +2649,7 @@ function createProjectile(player, spell, targetX, targetY, targetPlayerId = null
     createdAt: Date.now(),
     canHitPlayers: canPvP || (spell.canHitPlayers && player.pvpEnabled === true) || false,
     piercing: spell.piercing || false,
+    inDungeon: player.inDungeon || false, // Track dungeon state for isolation
   };
   
   // For homing missiles, track the target
@@ -2874,6 +2875,8 @@ function gameTick() {
     // Auto-cast spells (unless autoAttack is disabled)
     if (player.autoAttack !== false) {
       const classData = CLASSES[player.class];
+      const playerInDungeon = player.inDungeon || false;
+      
       if (classData) {
         for (const spellId of classData.spells) {
           const spell = SPELLS[spellId];
@@ -2887,9 +2890,12 @@ function gameTick() {
             let targetDist = spell.range;
             let targetIsPlayer = false;
 
-            // Search enemies first
+            // Search enemies first (only in same realm - dungeon or world)
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
+              // DUNGEON ISOLATION: Only target enemies in same realm
+              if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+              
               const dist = distance(player, enemy);
               if (dist < targetDist) {
                 targetDist = dist;
@@ -2967,17 +2973,24 @@ function gameTick() {
 
     // Get enemy's zone
     const enemyZone = enemy.zone ? ZONES[enemy.zone] : null;
+    const enemyInDungeon = enemy.isDungeon || false;
     
-    // Find nearest player IN THE SAME ZONE (anti-cheese)
+    // Find nearest player IN THE SAME ZONE AND REALM (dungeon isolation)
     let nearestPlayer = null;
     let nearestDist = Infinity;
 
     for (const player of alivePlayers) {
+      // DUNGEON ISOLATION: Only target players in same realm
+      const playerInDungeon = player.inDungeon || false;
+      if (enemyInDungeon !== playerInDungeon) {
+        continue; // Skip - different realm (dungeon vs world)
+      }
+      
       // Get player's zone
       const playerZone = getZoneAtPosition(player.x, player.y);
       
-      // Only aggro if player is in the same zone as enemy
-      if (enemyZone && playerZone && playerZone.id !== enemyZone.id) {
+      // Only aggro if player is in the same zone as enemy (for world enemies)
+      if (!enemyInDungeon && enemyZone && playerZone && playerZone.id !== enemyZone.id) {
         continue; // Skip - player not in our zone
       }
       
@@ -3632,8 +3645,14 @@ function gameTick() {
       // AOE visual effect
       spawnParticles(proj.x, proj.y, proj.color, 12);
       
+      // Use projectile's dungeon state for isolation
+      const projInDungeon = proj.inDungeon || false;
+      
       for (const enemy of gameState.enemies.values()) {
         if (enemy.health <= 0) continue;
+        // DUNGEON ISOLATION: Only hit enemies in same realm
+        if (projInDungeon !== (enemy.isDungeon || false)) continue;
+        
         if (distance(proj, enemy) < proj.radius + enemy.radius) {
           enemy.health -= proj.damage;
           
@@ -3702,8 +3721,13 @@ function gameTick() {
 
     // Check collision with enemies
     let hit = false;
+    const projInDungeon = proj.inDungeon || false;
+    
     for (const enemy of gameState.enemies.values()) {
       if (enemy.health <= 0) continue;
+      // DUNGEON ISOLATION: Only hit enemies in same realm
+      if (projInDungeon !== (enemy.isDungeon || false)) continue;
+      
       if (distance(proj, enemy) < proj.radius + enemy.radius) {
         const owner = gameState.players.get(proj.ownerId);
         const upgrades = owner?.spellUpgrades || [];
@@ -4463,10 +4487,14 @@ io.on('connection', (socket) => {
         player.lastDash = now;
         
         // Class-specific effects
+        const playerInDungeon = player.inDungeon || false;
+        
         if (dash.id === 'fireDash' && dash.damage) {
           // Fire trail damage
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            // DUNGEON ISOLATION
+            if (playerInDungeon !== (enemy.isDungeon || false)) continue;
             // Check if enemy is near the dash line
             const distToLine = pointToLineDistance(enemy, { x: startX, y: startY }, { x: player.x, y: player.y });
             if (distToLine < 40) {
@@ -4480,6 +4508,8 @@ io.on('connection', (socket) => {
           // Freeze enemies at destination
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            // DUNGEON ISOLATION
+            if (playerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, player) < dash.freezeRadius) {
               enemy.frozenUntil = now + dash.freezeDuration;
             }
@@ -4519,6 +4549,7 @@ io.on('connection', (socket) => {
         }
         
         player.lastUltimate = now;
+        const ultPlayerInDungeon = player.inDungeon || false;
         
         // Class-specific ultimates
         if (ult.id === 'meteor') {
@@ -4530,6 +4561,8 @@ io.on('connection', (socket) => {
           setTimeout(() => {
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
+              // DUNGEON ISOLATION
+              if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
               if (distance(enemy, { x: meteorX, y: meteorY }) < ult.radius) {
                 enemy.health -= ult.damage;
                 spawnDamageNumber(enemy.x, enemy.y - 20, ult.damage);
@@ -4545,6 +4578,8 @@ io.on('connection', (socket) => {
           // Ice nova - freeze and damage all nearby
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            // DUNGEON ISOLATION
+            if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, player) < ult.radius) {
               enemy.health -= ult.damage;
               enemy.frozenUntil = now + ult.freezeDuration;
@@ -4565,8 +4600,12 @@ io.on('connection', (socket) => {
               return;
             }
             
-            // Find random enemy in range
-            const enemies = [...gameState.enemies.values()].filter(e => e.health > 0 && distance(e, player) < 400);
+            // Find random enemy in range (DUNGEON ISOLATION)
+            const enemies = [...gameState.enemies.values()].filter(e => 
+              e.health > 0 && 
+              distance(e, player) < 400 &&
+              ultPlayerInDungeon === (e.isDungeon || false)
+            );
             if (enemies.length > 0) {
               const target = enemies[Math.floor(Math.random() * enemies.length)];
               createProjectile(player, {
@@ -4931,6 +4970,8 @@ io.on('connection', (socket) => {
       player[`lastAbility${abilitySlot}`] = now;
       
       // Execute ability based on type
+      const abilityPlayerInDungeon = player.inDungeon || false;
+      
       if (abilityId === 'flameShield') {
         // Flame Shield - damage aura around self
         player.flameShieldUntil = now + spell.duration;
@@ -4945,6 +4986,8 @@ io.on('connection', (socket) => {
           }
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            // DUNGEON ISOLATION
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, player) < spell.radius) {
               enemy.health -= spell.damage;
               spawnDamageNumber(enemy.x, enemy.y - 10, spell.damage);
@@ -4963,6 +5006,8 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            // DUNGEON ISOLATION
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, { x: meteorX, y: meteorY }) < spell.radius) {
               enemy.health -= spell.damage;
               spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
@@ -4977,6 +5022,8 @@ io.on('connection', (socket) => {
         // Inferno - massive AOE around self
         for (const enemy of gameState.enemies.values()) {
           if (enemy.health <= 0) continue;
+          // DUNGEON ISOLATION
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
           if (distance(enemy, player) < spell.radius) {
             enemy.health -= spell.damage;
             spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
@@ -4991,6 +5038,8 @@ io.on('connection', (socket) => {
         // Frost Nova - freeze nearby enemies
         for (const enemy of gameState.enemies.values()) {
           if (enemy.health <= 0) continue;
+          // DUNGEON ISOLATION
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
           if (distance(enemy, player) < spell.radius) {
             enemy.health -= spell.damage;
             enemy.frozenUntil = now + spell.freezeDuration;
@@ -5046,6 +5095,8 @@ io.on('connection', (socket) => {
           }
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            // DUNGEON ISOLATION
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, { x: stormX, y: stormY }) < spell.radius) {
               enemy.health -= spell.damage / 6; // Tick damage
               enemy.frozenUntil = Math.max(enemy.frozenUntil || 0, Date.now() + spell.freezeDuration);
@@ -5116,6 +5167,8 @@ io.on('connection', (socket) => {
         // Static Field - AOE stun
         for (const enemy of gameState.enemies.values()) {
           if (enemy.health <= 0) continue;
+          // DUNGEON ISOLATION
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
           if (distance(enemy, player) < spell.radius) {
             enemy.health -= spell.damage;
             enemy.frozenUntil = now + spell.stunDuration;
@@ -5169,6 +5222,8 @@ io.on('connection', (socket) => {
           
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0 || hitEnemies.has(enemy.id)) continue;
+            // DUNGEON ISOLATION
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             const dist = distance(enemy, { x: lastX, y: lastY });
             if (dist < nearestDist) {
               nearestDist = dist;
