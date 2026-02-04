@@ -1995,6 +1995,67 @@ function gameTick() {
 
       player.x = clamp(player.x, 20, WORLD.width - 20);
       player.y = clamp(player.y, 20, WORLD.height - 20);
+      
+      // Dungeon-specific bounds
+      if (player.inDungeon) {
+        player.x = clamp(player.x, 150, 750); // Corridor walls
+        player.y = clamp(player.y, 100, 4700); // Can't go past dragon
+      }
+    }
+    
+    // Dungeon wave spawning based on depth
+    if (player.inDungeon) {
+      const currentWave = Math.floor(player.y / 500);
+      const lastWave = player.dungeonWaveSpawned || 0;
+      
+      if (currentWave > lastWave && currentWave < 9) {
+        player.dungeonWaveSpawned = currentWave;
+        
+        // Spawn a wave of enemies at this depth
+        const dungeonEnemies = ['dungeon_skeleton', 'dungeon_wraith', 'dungeon_golem', 'dungeon_demon'];
+        const numEnemies = Math.min(6, 2 + currentWave); // More enemies in deeper waves
+        const depthMultiplier = 1 + currentWave * 0.3; // Enemies get stronger
+        
+        for (let i = 0; i < numEnemies; i++) {
+          // More dangerous enemies in later waves
+          let typeIndex = Math.floor(Math.random() * Math.min(dungeonEnemies.length, 1 + Math.floor(currentWave / 2)));
+          const type = dungeonEnemies[typeIndex];
+          const template = ENEMY_TYPES[type];
+          if (!template) continue;
+          
+          const spawnX = 200 + Math.random() * 500;
+          const spawnY = currentWave * 500 + 100 + Math.random() * 300;
+          
+          // Don't spawn in dragon lair
+          if (spawnY > 4200) continue;
+          
+          const enemy = {
+            id: uuidv4(),
+            type: type,
+            name: template.name,
+            health: Math.round(template.health * depthMultiplier),
+            maxHealth: Math.round(template.health * depthMultiplier),
+            baseSpeed: template.speed,
+            damage: Math.round(template.damage * depthMultiplier),
+            radius: template.radius,
+            xp: Math.round(template.xp * depthMultiplier),
+            color: template.color,
+            behavior: template.behavior,
+            x: spawnX,
+            y: spawnY,
+            zone: 'dungeon',
+            isDungeon: true,
+            facing: 'up',
+            animFrame: 0,
+            slowedUntil: 0,
+            frozenUntil: 0,
+          };
+          
+          gameState.enemies.set(enemy.id, enemy);
+        }
+        
+        console.log(`⚔️ Dungeon wave ${currentWave} spawned for ${player.name}`);
+      }
     }
 
     // Automatic portal entry
@@ -2098,7 +2159,8 @@ function gameTick() {
     const inSanctuary = playerZone?.id === 'sanctuary';
     
     if (inSanctuary && player.health < player.maxHealth) {
-      player.health = Math.min(player.health + 10 * dt, player.maxHealth);
+      // Heal 20 HP per second (faster healing)
+      player.health = Math.min(player.health + 20 * dt, player.maxHealth);
       player.isHealing = true;
     } else {
       player.isHealing = false;
@@ -3022,11 +3084,20 @@ function gameTick() {
     
     const px = player.x;
     const py = player.y;
+    const playerInDungeon = player.inDungeon || false;
     
-    // Filter entities by distance
+    // Filter entities by distance and dungeon context
     const nearbyEnemies = [...gameState.enemies.values()]
-      .filter(e => e.health > 0 && (e.revealed !== false) && 
-        Math.abs(e.x - px) < VIEW_DISTANCE && Math.abs(e.y - py) < VIEW_DISTANCE)
+      .filter(e => {
+        if (e.health <= 0) return false;
+        if (e.revealed === false) return false;
+        if (Math.abs(e.x - px) >= VIEW_DISTANCE || Math.abs(e.y - py) >= VIEW_DISTANCE) return false;
+        // Dungeon enemies only visible to dungeon players
+        if (e.isDungeon && !playerInDungeon) return false;
+        // Regular enemies not visible to dungeon players
+        if (!e.isDungeon && playerInDungeon) return false;
+        return true;
+      })
       .map(e => ({
         id: e.id,
         type: e.behavior === 'ambush' && !e.revealed ? 'xpOrb' : e.type,
@@ -3120,6 +3191,7 @@ function gameTick() {
         emote: p.emote || null, emoteStart: p.emoteStart || null,
         isHealing: p.isHealing || false,
         bossKills: p.bossKills || {},
+        inDungeon: p.inDungeon || false,
       })),
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,
@@ -3798,46 +3870,6 @@ io.on('connection', (socket) => {
             player.emoteStart = null;
           }
         }, 3000);
-        break;
-      }
-    }
-  });
-
-  // Recall to Sanctuary (B key) - 5 second cooldown
-  socket.on('recall', () => {
-    for (const player of gameState.players.values()) {
-      if (player.socketId === socket.id && player.health > 0) {
-        const now = Date.now();
-        const RECALL_COOLDOWN = 5000; // 5 seconds
-        
-        // Check cooldown
-        if (player.lastRecall && now - player.lastRecall < RECALL_COOLDOWN) {
-          const remaining = Math.ceil((RECALL_COOLDOWN - (now - player.lastRecall)) / 1000);
-          socket.emit('recallCooldown', { remaining });
-          break;
-        }
-        
-        // Store starting position for effect
-        const fromX = player.x;
-        const fromY = player.y;
-        
-        // Set cooldown
-        player.lastRecall = now;
-        
-        // Teleport to sanctuary center
-        player.x = 3000;
-        player.y = 2500;
-        
-        // Notify client with both positions
-        socket.emit('recalled', { 
-          fromX, fromY, 
-          toX: 3000, toY: 2500,
-          cooldown: RECALL_COOLDOWN,
-        });
-        
-        // Visual effect at departure location for other players
-        io.emit('recallEffect', { x: fromX, y: fromY, playerId: player.id });
-        io.emit('sound', { type: 'portalEnter', x: player.x, y: player.y });
         break;
       }
     }
