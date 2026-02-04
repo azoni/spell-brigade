@@ -2522,8 +2522,8 @@ function spawnDungeonEnemies(player) {
     const x = 250 + (i - numEnemies/2) * 80 + Math.random() * 50;
     const y = baseY + Math.random() * 100;
     
-    // Don't spawn past dragon
-    if (y > 4400) continue;
+    // Don't spawn past dragon lair
+    if (y > 2800) continue;
     
     const enemy = {
       id: uuidv4(),
@@ -2827,47 +2827,12 @@ function gameTick() {
             lastAttack: 0,
             createdAt: Date.now(),
             inDungeon: true,
+            isDungeon: true,
           };
           gameState.enemies.set(enemy.id, enemy);
         }
         
         console.log(`🏰 Room ${currentRoom} enemies spawned for ${player.name}`);
-      }
-    }
-
-    // Automatic portal entry
-    if (!player.portalCooldown || now > player.portalCooldown) {
-      for (const [portalId, portal] of Object.entries(PORTALS)) {
-        const distToPortal = distance(player, portal.from);
-        if (distToPortal < 80) {  // Larger detection radius for easier entry
-          // Check level requirement
-          if (player.level >= portal.requiredLevel) {
-            // Teleport!
-            const oldX = player.x;
-            const oldY = player.y;
-            player.x = portal.to.x;
-            player.y = portal.to.y;
-            player.portalCooldown = now + 1000; // 1 second cooldown
-            
-            // Notify client
-            const socket = io.sockets.sockets.get(player.socketId);
-            if (socket) {
-              socket.emit('portalUsed', {
-                portalId,
-                fromX: oldX,
-                fromY: oldY,
-                toX: portal.to.x,
-                toY: portal.to.y,
-                toZone: portal.toZone,
-                color: portal.color,
-              });
-            }
-            
-            io.emit('sound', { type: 'portalEnter', x: oldX, y: oldY });
-            io.emit('sound', { type: 'portalExit', x: portal.to.x, y: portal.to.y });
-            break;
-          }
-        }
       }
     }
 
