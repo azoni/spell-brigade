@@ -436,6 +436,37 @@ const NPCS = {
       enter: "Very well. May your flames burn bright, wizard. Step through when ready.",
     },
   },
+  shapeshifter: {
+    id: 'shapeshifter',
+    name: 'Mirage the Shapeshifter',
+    type: 'shapeshifter',
+    x: 3250, y: 2950,
+    radius: 20,
+    zone: 'sanctuary',
+    color: '#ec4899',
+    interactRange: 80,
+    stationary: true,
+    forms: [
+      { name: 'Mirage the Shapeshifter', emoji: '🦋', color: '#ec4899', desc: 'A butterfly of prismatic light' },
+      { name: 'Umbra the Shadow', emoji: '👻', color: '#6b7280', desc: 'A wisp of living darkness' },
+      { name: 'Prism the Elemental', emoji: '💎', color: '#06b6d4', desc: 'A crystalline being of pure energy' },
+      { name: 'Phoenix Ember', emoji: '🔥', color: '#f97316', desc: 'A bird made of eternal flame' },
+      { name: 'Whisper the Fae', emoji: '✨', color: '#a855f7', desc: 'A mischievous fairy creature' },
+      { name: 'Tempest the Storm', emoji: '⚡', color: '#fbbf24', desc: 'Lightning given physical form' },
+      { name: 'Frost Bloom', emoji: '❄️', color: '#67e8f9', desc: 'An ice flower that never melts' },
+      { name: 'The Wandering Eye', emoji: '👁️', color: '#ef4444', desc: 'A floating orb of arcane sight' },
+    ],
+    currentFormIndex: 0,
+    lastFormChange: 0,
+    formChangeInterval: 15 * 60 * 1000, // 15 minutes
+    greetings: [
+      "Ah, you see me as I am now... but in a moment, I could be anything.",
+      "Identity is fluid, young one. Would you like to change your appearance?",
+      "I have walked this world in a thousand forms. Perhaps you seek a new look?",
+      "The mirror shows what we choose to be. Let me help you reshape yourself.",
+    ],
+    skinPrompt: "Would you like to change your appearance?",
+  },
 };
 
 // NPC State tracking
@@ -1467,14 +1498,23 @@ const gameState = {
 // Initialize NPCs
 function initNpcs() {
   for (const [id, npc] of Object.entries(NPCS)) {
-    gameState.npcs.set(id, {
+    const npcState = {
       ...npc,
       currentX: npc.x,
       currentY: npc.y,
       facing: 'down',
       wanderAngle: Math.random() * Math.PI * 2,
       lastWander: Date.now(),
-    });
+    };
+    
+    // Initialize shapeshifter with first form
+    if (npc.type === 'shapeshifter' && npc.forms && npc.forms.length > 0) {
+      npcState.currentFormIndex = 0;
+      npcState.emoji = npc.forms[0].emoji;
+      npcState.lastFormChange = Date.now();
+    }
+    
+    gameState.npcs.set(id, npcState);
   }
   console.log(`✨ Initialized ${gameState.npcs.size} NPCs`);
 }
@@ -4026,6 +4066,20 @@ function gameTick() {
         npc.facing = vy > 0 ? 'down' : 'up';
       }
     }
+    
+    // Shapeshifter form changes
+    if (npc.type === 'shapeshifter' && npc.forms) {
+      const timeSinceChange = now - (npc.lastFormChange || 0);
+      if (timeSinceChange > (npc.formChangeInterval || 900000)) { // 15 min default
+        npc.currentFormIndex = (npc.currentFormIndex + 1) % npc.forms.length;
+        const newForm = npc.forms[npc.currentFormIndex];
+        npc.name = newForm.name;
+        npc.color = newForm.color;
+        npc.emoji = newForm.emoji;
+        npc.lastFormChange = now;
+        console.log(`🦋 Shapeshifter changed form to: ${newForm.name}`);
+      }
+    }
   }
 
   // --- BROADCAST STATE (Per-player with view distance filtering) ---
@@ -4127,6 +4181,7 @@ function gameTick() {
         x: Math.round(npc.currentX),
         y: Math.round(npc.currentY),
         color: npc.color,
+        emoji: npc.emoji,
         facing: npc.facing || 'down',
         interactRange: npc.interactRange,
         stationary: npc.stationary,
@@ -5399,6 +5454,20 @@ io.on('connection', (socket) => {
               hasChoice: true,
             });
           }
+        } else if (npc.type === 'shapeshifter') {
+          // Shapeshifter - skin changer
+          const greeting = npc.greetings[Math.floor(Math.random() * npc.greetings.length)];
+          const currentForm = npc.forms[npc.currentFormIndex || 0];
+          socket.emit('npcDialogue', {
+            npcId: npc.id,
+            npcName: npc.name,
+            npcType: npc.type,
+            dialogue: [greeting],
+            prompt: npc.skinPrompt,
+            hasChoice: true,
+            emoji: currentForm?.emoji || '🦋',
+            openSkinSelect: true, // Special flag to open skin selector
+          });
         }
         break;
       }
