@@ -1727,36 +1727,38 @@ function gameTick() {
       player.animFrame = ((player.animFrame || 0) + 1) % 4;
     }
 
-    // Auto-cast spells
-    const classData = CLASSES[player.class];
-    if (classData) {
-      for (const spellId of classData.spells) {
-        const spell = SPELLS[spellId];
-        if (!spell) continue;
+    // Auto-cast spells (unless autoAttack is disabled)
+    if (player.autoAttack !== false) {
+      const classData = CLASSES[player.class];
+      if (classData) {
+        for (const spellId of classData.spells) {
+          const spell = SPELLS[spellId];
+          if (!spell) continue;
 
-        const lastCast = player.lastCast?.[spellId] || 0;
-        if (now - lastCast >= spell.cooldown) {
-          // Find target
-          let target = null;
-          let targetDist = spell.range;
+          const lastCast = player.lastCast?.[spellId] || 0;
+          if (now - lastCast >= spell.cooldown) {
+            // Find target
+            let target = null;
+            let targetDist = spell.range;
 
-          for (const enemy of gameState.enemies.values()) {
-            if (enemy.health <= 0) continue;
-            const dist = distance(player, enemy);
-            if (dist < targetDist) {
-              targetDist = dist;
-              target = enemy;
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              const dist = distance(player, enemy);
+              if (dist < targetDist) {
+                targetDist = dist;
+                target = enemy;
+              }
             }
-          }
 
-          if (target) {
-            createProjectile(player, spell, target.x, target.y);
-            player.lastCast = player.lastCast || {};
-            player.lastCast[spellId] = now;
-            player.state = 'attack';
-            
-            // Sound event
-            io.emit('sound', { type: 'spell', spellId, x: player.x, y: player.y });
+            if (target) {
+              createProjectile(player, spell, target.x, target.y);
+              player.lastCast = player.lastCast || {};
+              player.lastCast[spellId] = now;
+              player.state = 'attack';
+              
+              // Sound event
+              io.emit('sound', { type: 'spell', spellId, x: player.x, y: player.y });
+            }
           }
         }
       }
@@ -3010,6 +3012,93 @@ io.on('connection', (socket) => {
           }, ult.duration / ult.missiles);
           
           io.emit('sound', { type: 'arcaneBarrage', x: player.x, y: player.y });
+        
+        } else if (ult.id === 'voidRift') {
+          // Voidlord ultimate - Create a void rift that pulls and damages all enemies and players
+          const riftX = tx ?? player.x;
+          const riftY = ty ?? player.y;
+          
+          // Emit the rift effect
+          io.emit('voidRift', { 
+            x: riftX, 
+            y: riftY, 
+            radius: ult.radius, 
+            duration: ult.duration,
+            playerId: player.id,
+          });
+          
+          // Apply damage and pull over the duration
+          let ticks = 0;
+          const maxTicks = Math.floor(ult.duration / 100);
+          const damagePerTick = ult.damage / maxTicks;
+          
+          const riftInterval = setInterval(() => {
+            if (ticks >= maxTicks) {
+              clearInterval(riftInterval);
+              // Final explosion
+              io.emit('explosion', { x: riftX, y: riftY, radius: ult.radius * 0.5, color: '#ff00ff' });
+              return;
+            }
+            
+            // Damage and pull enemies
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              const dist = distance(enemy, { x: riftX, y: riftY });
+              if (dist < ult.radius) {
+                // Pull toward center
+                const pullStrength = (1 - dist / ult.radius) * ult.pullForce * 0.1;
+                const dx = riftX - enemy.x;
+                const dy = riftY - enemy.y;
+                const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+                enemy.x += (dx / mag) * pullStrength;
+                enemy.y += (dy / mag) * pullStrength;
+                
+                // Damage
+                if (ticks % 3 === 0) { // Every 300ms
+                  enemy.health -= damagePerTick * 3;
+                  spawnDamageNumber(enemy.x, enemy.y - 20, Math.round(damagePerTick * 3));
+                  checkEnemyDeath(enemy, player.id);
+                }
+              }
+            }
+            
+            // Damage other players (PvP)
+            for (const otherPlayer of gameState.players.values()) {
+              if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
+              const dist = distance(otherPlayer, { x: riftX, y: riftY });
+              if (dist < ult.radius) {
+                // Pull toward center
+                const pullStrength = (1 - dist / ult.radius) * ult.pullForce * 0.05;
+                const dx = riftX - otherPlayer.x;
+                const dy = riftY - otherPlayer.y;
+                const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+                otherPlayer.x += (dx / mag) * pullStrength;
+                otherPlayer.y += (dy / mag) * pullStrength;
+                
+                // Damage (less frequent)
+                if (ticks % 5 === 0) {
+                  otherPlayer.health -= damagePerTick * 2;
+                  spawnDamageNumber(otherPlayer.x, otherPlayer.y - 20, Math.round(damagePerTick * 2));
+                  
+                  const otherSocket = io.sockets.sockets.get(otherPlayer.socketId);
+                  if (otherSocket) {
+                    otherSocket.emit('damaged', { amount: damagePerTick * 2 });
+                  }
+                  
+                  if (otherPlayer.health <= 0) {
+                    otherPlayer.deaths = (otherPlayer.deaths || 0) + 1;
+                    if (otherSocket) {
+                      otherSocket.emit('died', { killedBy: 'Void Lord', deathMessage: 'Consumed by the void!' });
+                    }
+                  }
+                }
+              }
+            }
+            
+            ticks++;
+          }, 100);
+          
+          io.emit('sound', { type: 'voidRift', x: riftX, y: riftY });
         }
         
         socket.emit('ultimateUsed', { cooldown: ult.cooldown });
@@ -3186,6 +3275,17 @@ io.on('connection', (socket) => {
         
         // Visual effect at both locations
         io.emit('sound', { type: 'portalEnter', x: player.x, y: player.y });
+        break;
+      }
+    }
+  });
+
+  // Toggle auto-attack
+  socket.on('toggleAutoAttack', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        player.autoAttack = player.autoAttack === false ? true : false;
+        socket.emit('autoAttackToggled', { enabled: player.autoAttack !== false });
         break;
       }
     }
