@@ -342,7 +342,7 @@ const BUILDINGS = {
   campfire: {
     id: 'campfire',
     name: 'Campfire',
-    x: 2850, y: 2600,
+    x: 2600, y: 2850,
     width: 40, height: 40,
     zone: 'sanctuary',
     color: '#f97316',
@@ -359,7 +359,7 @@ const NPCS = {
     id: 'ethereal_guide',
     name: 'Ethereal Guide',
     type: 'guide',
-    x: 3100, y: 2400,
+    x: 2700, y: 2800,
     radius: 20,
     zone: 'sanctuary',
     color: '#67e8f9',
@@ -380,7 +380,7 @@ const NPCS = {
     id: 'knight_commander',
     name: 'Knight Commander Aldric',
     type: 'knight',
-    x: 2900, y: 2550,
+    x: 2500, y: 2900,
     radius: 18,
     zone: 'sanctuary',
     color: '#a8a29e',
@@ -538,7 +538,7 @@ const CLASSES = {
     color: '#1a0a2e',
     secondaryColor: '#ff00ff',
     baseHealth: 200,
-    baseSpeed: 200,
+    baseSpeed: 280, // Significantly faster than other classes
     spells: ['voidBolt', 'annihilate'],
     description: 'Master of the void. Unmatched power.',
     isAdmin: true,
@@ -870,6 +870,56 @@ const SPELLS = {
     hotkey: 3,
     description: 'Call upon the fury of storms to devastate all enemies',
   },
+
+  // === VOIDLORD CLASS ABILITIES ===
+  voidRiftAbility: {
+    id: 'voidRiftAbility',
+    name: 'Void Rift',
+    damage: 50,
+    cooldown: 8000,
+    range: 300,
+    speed: 0,
+    radius: 120,
+    color: '#8b00ff',
+    isAoe: true,
+    duration: 4000,
+    class: 'voidlord',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Tear open a rift to the void that damages enemies',
+  },
+  soulDrain: {
+    id: 'soulDrain',
+    name: 'Soul Drain',
+    damage: 80,
+    cooldown: 12000,
+    range: 400,
+    speed: 400,
+    radius: 15,
+    color: '#ff00ff',
+    trailColor: '#8b008b',
+    homing: true,
+    lifesteal: 0.5,
+    class: 'voidlord',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Launch a soul-seeking projectile that heals you',
+  },
+  apocalypse: {
+    id: 'apocalypse',
+    name: 'Apocalypse',
+    damage: 500,
+    cooldown: 60000,
+    range: 0,
+    speed: 0,
+    radius: 500,
+    color: '#1a0a2e',
+    isAoe: true,
+    class: 'voidlord',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Unleash the void to annihilate everything nearby',
+  },
 };
 
 // ===========================================
@@ -1157,22 +1207,58 @@ const ENEMY_TYPES = {
     attackCooldown: 3000,
     attackType: 'demon_fire', // Shoots fireballs
   },
-  // DRAGON BOSS - Final boss of dungeon
+  
+  // DUNGEON MINI-BOSSES
+  dungeon_minotaur: {
+    id: 'dungeon_minotaur',
+    name: 'Ironhide Minotaur',
+    health: 2000,
+    damage: 60,
+    speed: 70,
+    radius: 35,
+    xp: 800,
+    color: '#78350f',
+    behavior: 'charge',
+    isMiniBoss: true,
+    isDungeon: true,
+    zone: 'dungeon',
+    attackCooldown: 3000,
+    chargeSpeed: 300,
+    chargeDistance: 400,
+  },
+  dungeon_lich: {
+    id: 'dungeon_lich',
+    name: 'Lich King',
+    health: 1500,
+    damage: 45,
+    speed: 50,
+    radius: 28,
+    xp: 700,
+    color: '#1e1b4b',
+    behavior: 'caster',
+    isMiniBoss: true,
+    isDungeon: true,
+    zone: 'dungeon',
+    attackCooldown: 2000,
+    summonCount: 3,
+  },
+  
+  // DRAGON BOSS - Final boss of dungeon (4x bigger)
   boss_dragon: {
     id: 'boss_dragon',
     name: 'Infernal Dragon',
-    health: 10000,
-    damage: 80,
-    speed: 40,
-    radius: 80,
-    xp: 5000,
+    health: 15000,
+    damage: 100,
+    speed: 35,
+    radius: 160, // 4x bigger (was 40, now 160)
+    xp: 8000,
     color: '#b91c1c',
     behavior: 'boss_dragon',
     isBoss: true,
     isDungeon: true,
     zone: 'dungeon',
     attackCooldown: 2000,
-    attacks: ['flame_breath', 'wing_gust', 'tail_swipe', 'summon_minions', 'rage_mode'],
+    attacks: ['flame_breath', 'wing_gust', 'tail_swipe', 'summon_minions', 'meteor_rain', 'rage_mode'],
   },
 };
 
@@ -1716,6 +1802,54 @@ function spawnZoneBoss(zoneId) {
 // Handle boss death - set respawn timer and drop spell upgrades
 function onBossDeath(enemy, killer) {
   const zoneId = enemy.zone;
+  
+  // Dragon boss killed - spawn victory portal
+  if (enemy.type === 'boss_dragon') {
+    console.log('🐉 DRAGON DEFEATED! Spawning victory portal...');
+    
+    // Emit dragon defeated event with victory portal
+    io.emit('dragonDefeated', { 
+      x: enemy.x, 
+      y: enemy.y,
+      killerName: killer?.name || 'Unknown Hero',
+    });
+    
+    // Set dungeon victory portal state
+    gameState.dungeonVictoryPortal = {
+      x: enemy.x,
+      y: enemy.y - 100,
+      active: true,
+      createdAt: Date.now(),
+    };
+    
+    // Announce to all
+    io.emit('chat', {
+      type: 'system',
+      text: `🐉🏆 THE INFERNAL DRAGON HAS BEEN SLAIN BY ${(killer?.name || 'A BRAVE HERO').toUpperCase()}! 🏆🐉`,
+    });
+    
+    // Grant huge rewards
+    if (killer) {
+      const dragonRewardXp = 10000;
+      killer.xp += dragonRewardXp;
+      killer.totalXp += dragonRewardXp;
+      killer.bossKills = killer.bossKills || {};
+      killer.bossKills.dragon = true;
+      
+      const socket = io.sockets.sockets.get(killer.socketId);
+      if (socket) {
+        socket.emit('dragonSlayerReward', {
+          xp: dragonRewardXp,
+          title: 'Dragonslayer',
+        });
+      }
+      
+      savePlayerToDb(killer);
+    }
+    
+    return; // Skip normal boss respawn logic for dragon
+  }
+  
   if (zoneId && ZONE_BOSS_TYPES[zoneId]) {
     gameState.zoneBosses.delete(zoneId);
     gameState.bossRespawnTimers.set(zoneId, Date.now() + BOSS_RESPAWN_TIME);
@@ -2059,8 +2193,8 @@ function spawnDragonBoss() {
     behavior: 'boss_dragon',
     isBoss: true,
     isDungeon: true,
-    x: 450,
-    y: 4600,
+    x: 400,
+    y: 3000, // Dragon lair center
     zone: 'dungeon',
     facing: 'up',
     animFrame: 0,
@@ -2117,7 +2251,7 @@ function createProjectile(player, spell, targetX, targetY, targetPlayerId = null
     y: player.y,
     vx: dir.x * speed,
     vy: dir.y * speed,
-    damage: spell.damage,
+    damage: Math.floor(spell.damage * (player.damageMultiplier || 1)),
     radius: spell.radius,
     color: spell.color,
     trailColor: spell.trailColor || spell.color,
@@ -2187,8 +2321,10 @@ function gameTick() {
 
     if (isMoving) {
       const move = normalize({ x: dx, y: dy });
-      const classData = CLASSES[player.class];
-      const speed = classData?.baseSpeed || 150;
+      // Use player's stored baseSpeed (includes level bonus) and apply speedMultiplier from upgrades
+      const baseSpeed = player.baseSpeed || CLASSES[player.class]?.baseSpeed || 150;
+      const speedMult = player.speedMultiplier || 1;
+      const speed = baseSpeed * speedMult;
       
       player.x += move.x * speed * dt;
       player.y += move.y * speed * dt;
@@ -2203,38 +2339,75 @@ function gameTick() {
       player.x = clamp(player.x, 20, WORLD.width - 20);
       player.y = clamp(player.y, 20, WORLD.height - 20);
       
-      // Dungeon-specific bounds
+      // Dungeon-specific bounds - room-based layout
       if (player.inDungeon) {
-        player.x = clamp(player.x, 150, 750); // Corridor walls
-        player.y = clamp(player.y, 100, 4700); // Can't go past dragon
+        // Dungeon layout: entrance -> corridors -> rooms -> dragon lair
+        // Y coordinates: 0-3200
+        const y = player.y;
+        let minX = 100, maxX = 700;
+        
+        // Different room widths
+        if (y < 400) {
+          // Entrance chamber - medium width
+          minX = 200; maxX = 600;
+        } else if (y < 600 || (y >= 1000 && y < 1200) || (y >= 1600 && y < 1800) || (y >= 2200 && y < 2400)) {
+          // Corridors - narrow
+          minX = 300; maxX = 500;
+        } else if (y >= 2800) {
+          // Dragon lair - wide arena
+          minX = 100; maxX = 700;
+        } else {
+          // Regular rooms - medium-wide
+          minX = 150; maxX = 650;
+        }
+        
+        player.x = clamp(player.x, minX, maxX);
+        player.y = clamp(player.y, 50, 3150); // Can't go past dragon lair end
+        
+        // Track dungeon room for client rendering
+        if (y < 400) player.dungeonRoom = 0;
+        else if (y < 1000) player.dungeonRoom = 1;
+        else if (y < 1600) player.dungeonRoom = 2;
+        else if (y < 2200) player.dungeonRoom = 3;
+        else if (y < 2800) player.dungeonRoom = 4;
+        else player.dungeonRoom = 5; // Dragon lair
       }
     }
     
     // Dungeon wave spawning based on depth
     if (player.inDungeon) {
-      const currentWave = Math.floor(player.y / 500);
-      const lastWave = player.dungeonWaveSpawned || 0;
+      const currentRoom = player.dungeonRoom || 0;
+      const lastRoom = player.dungeonRoomCleared || -1;
       
-      if (currentWave > lastWave && currentWave < 9) {
-        player.dungeonWaveSpawned = currentWave;
+      // Spawn enemies when entering a new room (not entrance or dragon lair)
+      if (currentRoom > lastRoom && currentRoom > 0 && currentRoom < 5) {
+        player.dungeonRoomCleared = currentRoom;
         
-        // Spawn a wave of enemies at this depth
-        const dungeonEnemies = ['dungeon_skeleton', 'dungeon_wraith', 'dungeon_golem', 'dungeon_demon'];
-        const numEnemies = Math.min(6, 2 + currentWave); // More enemies in deeper waves
-        const depthMultiplier = 1 + currentWave * 0.3; // Enemies get stronger
+        // Room-specific enemy spawning - includes mini-bosses in rooms 2 and 4
+        const roomEnemies = {
+          1: ['dungeon_skeleton', 'dungeon_skeleton', 'dungeon_skeleton', 'dungeon_wraith'],
+          2: ['dungeon_wraith', 'dungeon_wraith', 'dungeon_skeleton', 'dungeon_minotaur'], // Mini-boss: Minotaur
+          3: ['dungeon_golem', 'dungeon_golem', 'dungeon_wraith', 'dungeon_wraith'],
+          4: ['dungeon_demon', 'dungeon_demon', 'dungeon_golem', 'dungeon_lich'], // Mini-boss: Lich
+        };
         
-        for (let i = 0; i < numEnemies; i++) {
-          // More dangerous enemies in later waves
-          let typeIndex = Math.floor(Math.random() * Math.min(dungeonEnemies.length, 1 + Math.floor(currentWave / 2)));
-          const type = dungeonEnemies[typeIndex];
+        const enemies = roomEnemies[currentRoom] || ['dungeon_skeleton'];
+        const roomY = {
+          1: 700, // Skeleton room center
+          2: 1400, // Wraith room center - has Minotaur
+          3: 2000, // Golem room center
+          4: 2600, // Demon room center - has Lich
+        };
+        
+        const depthMultiplier = 1 + currentRoom * 0.25;
+        
+        for (let i = 0; i < enemies.length; i++) {
+          const type = enemies[i];
           const template = ENEMY_TYPES[type];
           if (!template) continue;
           
-          const spawnX = 200 + Math.random() * 500;
-          const spawnY = currentWave * 500 + 100 + Math.random() * 300;
-          
-          // Don't spawn in dragon lair
-          if (spawnY > 4200) continue;
+          const spawnX = 200 + Math.random() * 400;
+          const spawnY = roomY[currentRoom] + (Math.random() - 0.5) * 200;
           
           const enemy = {
             id: uuidv4(),
@@ -2250,18 +2423,19 @@ function gameTick() {
             behavior: template.behavior,
             x: spawnX,
             y: spawnY,
+            spawnX: spawnX,
+            spawnY: spawnY,
             zone: 'dungeon',
-            isDungeon: true,
-            facing: 'up',
-            animFrame: 0,
+            targetId: null,
             slowedUntil: 0,
-            frozenUntil: 0,
+            lastAttack: 0,
+            createdAt: Date.now(),
+            inDungeon: true,
           };
-          
           gameState.enemies.set(enemy.id, enemy);
         }
         
-        console.log(`⚔️ Dungeon wave ${currentWave} spawned for ${player.name}`);
+        console.log(`🏰 Room ${currentRoom} enemies spawned for ${player.name}`);
       }
     }
 
@@ -2317,7 +2491,8 @@ function gameTick() {
           if (!spell) continue;
 
           const lastCast = player.lastCast?.[spellId] || 0;
-          if (now - lastCast >= spell.cooldown) {
+          const effectiveCooldown = spell.cooldown * (player.cooldownMultiplier || 1);
+          if (now - lastCast >= effectiveCooldown) {
             // Find target
             let target = null;
             let targetDist = spell.range;
@@ -2423,6 +2598,150 @@ function gameTick() {
         io.emit('sound', { type: 'mimicReveal', x: enemy.x, y: enemy.y });
       } else {
         continue; // Stay hidden
+      }
+    }
+    
+    // ========== MINI-BOSS BEHAVIORS ==========
+    // Minotaur charge attack
+    if (enemy.behavior === 'charge' && nearestPlayer && enemy.isMiniBoss) {
+      const template = ENEMY_TYPES[enemy.type];
+      const chargeCooldown = template?.attackCooldown || 3000;
+      
+      if (!enemy.isCharging && now - (enemy.lastAbility || 0) > chargeCooldown && nearestDist < 400) {
+        // Start charging at player
+        enemy.isCharging = true;
+        enemy.chargeTarget = { x: nearestPlayer.x, y: nearestPlayer.y };
+        enemy.chargeStart = now;
+        enemy.lastAbility = now;
+        
+        io.emit('minotaurCharge', { 
+          id: enemy.id, 
+          x: enemy.x, 
+          y: enemy.y, 
+          targetX: nearestPlayer.x, 
+          targetY: nearestPlayer.y 
+        });
+        io.emit('sound', { type: 'charge', x: enemy.x, y: enemy.y });
+      }
+      
+      if (enemy.isCharging) {
+        const chargeSpeed = template?.chargeSpeed || 300;
+        const dir = normalize({ 
+          x: enemy.chargeTarget.x - enemy.x, 
+          y: enemy.chargeTarget.y - enemy.y 
+        });
+        
+        enemy.x += dir.x * chargeSpeed * dt;
+        enemy.y += dir.y * chargeSpeed * dt;
+        
+        // Damage players hit during charge
+        for (const player of gameState.players.values()) {
+          if (player.health <= 0 || player.invincible) continue;
+          if (distance(enemy, player) < enemy.radius + 20) {
+            player.health -= template?.damage || 60;
+            spawnDamageNumber(player.x, player.y - 20, template?.damage || 60);
+            io.to(player.socketId).emit('damaged', { amount: template?.damage || 60 });
+            
+            // Knockback
+            const knockDir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
+            player.x += knockDir.x * 80;
+            player.y += knockDir.y * 80;
+            
+            if (player.health <= 0) {
+              player.deaths = (player.deaths || 0) + 1;
+              io.to(player.socketId).emit('died', { killedBy: enemy.name });
+            }
+          }
+        }
+        
+        // End charge after distance or time
+        const chargeDistTraveled = distance({ x: enemy.x, y: enemy.y }, enemy.chargeTarget);
+        if (chargeDistTraveled < 30 || now - enemy.chargeStart > 2000) {
+          enemy.isCharging = false;
+          io.emit('minotaurChargeEnd', { id: enemy.id, x: enemy.x, y: enemy.y });
+        }
+        
+        continue; // Skip normal movement during charge
+      }
+    }
+    
+    // Lich summoning and magic attacks
+    if (enemy.behavior === 'caster' && nearestPlayer && enemy.isMiniBoss) {
+      const template = ENEMY_TYPES[enemy.type];
+      const castCooldown = template?.attackCooldown || 2000;
+      
+      if (now - (enemy.lastAbility || 0) > castCooldown && nearestDist < 350) {
+        enemy.lastAbility = now;
+        enemy.attackPattern = ((enemy.attackPattern || 0) + 1) % 3;
+        
+        if (enemy.attackPattern === 0) {
+          // Soul bolt - aimed projectile
+          const dir = normalize({ x: nearestPlayer.x - enemy.x, y: nearestPlayer.y - enemy.y });
+          const proj = {
+            id: uuidv4(),
+            x: enemy.x,
+            y: enemy.y,
+            vx: dir.x * 250,
+            vy: dir.y * 250,
+            damage: 35,
+            radius: 12,
+            color: '#6366f1',
+            trailColor: '#a5b4fc',
+            maxRange: 400,
+            traveled: 0,
+            fromEnemy: true,
+            createdAt: now,
+          };
+          gameState.projectiles.set(proj.id, proj);
+          io.emit('sound', { type: 'spell', x: enemy.x, y: enemy.y });
+        } else if (enemy.attackPattern === 1) {
+          // Summon skeletons
+          const summonCount = template?.summonCount || 2;
+          for (let i = 0; i < summonCount; i++) {
+            const summonX = enemy.x + (Math.random() - 0.5) * 100;
+            const summonY = enemy.y + (Math.random() - 0.5) * 100;
+            const skelTemplate = ENEMY_TYPES.dungeon_skeleton;
+            if (skelTemplate) {
+              const minion = {
+                id: uuidv4(),
+                type: 'dungeon_skeleton',
+                name: 'Risen Dead',
+                health: skelTemplate.health * 0.5,
+                maxHealth: skelTemplate.health * 0.5,
+                baseSpeed: skelTemplate.speed,
+                damage: skelTemplate.damage * 0.7,
+                radius: skelTemplate.radius,
+                xp: 15,
+                color: '#4c1d95',
+                behavior: 'chase',
+                x: summonX,
+                y: summonY,
+                zone: 'dungeon',
+                isDungeon: true,
+                slowedUntil: 0,
+                frozenUntil: 0,
+              };
+              gameState.enemies.set(minion.id, minion);
+            }
+          }
+          io.emit('lichSummon', { x: enemy.x, y: enemy.y });
+          spawnParticles(enemy.x, enemy.y, '#6366f1', 15);
+        } else {
+          // Death wave - AOE damage
+          io.emit('lichDeathWave', { x: enemy.x, y: enemy.y, radius: 150 });
+          for (const player of gameState.players.values()) {
+            if (player.health <= 0 || player.invincible) continue;
+            if (distance(enemy, player) < 150) {
+              player.health -= 30;
+              spawnDamageNumber(player.x, player.y - 20, 30);
+              io.to(player.socketId).emit('damaged', { amount: 30 });
+              if (player.health <= 0) {
+                player.deaths = (player.deaths || 0) + 1;
+                io.to(player.socketId).emit('died', { killedBy: enemy.name });
+              }
+            }
+          }
+        }
       }
     }
 
@@ -4144,6 +4463,7 @@ io.on('connection', (socket) => {
         cryomancer: { 1: 'frostNova', 2: 'iceLance', 3: 'glacialStorm' },
         arcanist: { 1: 'blink', 2: 'arcaneBarrage', 3: 'timeWarp' },
         stormcaller: { 1: 'staticField', 2: 'ballLightning', 3: 'thunderGod' },
+        voidlord: { 1: 'voidRiftAbility', 2: 'soulDrain', 3: 'apocalypse' },
       };
       
       const levelReqs = { 1: 10, 2: 20, 3: 30 };
@@ -4438,6 +4758,70 @@ io.on('connection', (socket) => {
         spawnParticles(player.x, player.y, '#ffffff', 50);
         chainNext();
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'voidRiftAbility') {
+        // Void Rift - persistent damage zone
+        const riftX = tx ?? player.x;
+        const riftY = ty ?? player.y;
+        io.emit('voidRift', { x: riftX, y: riftY, radius: spell.radius, duration: spell.duration });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+        const riftEnd = now + spell.duration;
+        const riftInterval = setInterval(() => {
+          if (Date.now() > riftEnd) {
+            clearInterval(riftInterval);
+            return;
+          }
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (distance(enemy, { x: riftX, y: riftY }) < spell.radius) {
+              enemy.health -= spell.damage / 4; // Tick damage
+              spawnDamageNumber(enemy.x, enemy.y - 10, Math.floor(spell.damage / 4));
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+        }, 500);
+        
+      } else if (abilityId === 'soulDrain') {
+        // Soul Drain - homing projectile with lifesteal
+        const dx = (tx ?? player.x + 100) - player.x;
+        const dy = (ty ?? player.y) - player.y;
+        const dir = normalize({ x: dx, y: dy });
+        
+        const proj = {
+          id: uuidv4(),
+          x: player.x,
+          y: player.y,
+          vx: dir.x * spell.speed,
+          vy: dir.y * spell.speed,
+          radius: spell.radius,
+          damage: spell.damage,
+          color: spell.color,
+          trailColor: spell.trailColor,
+          ownerId: player.id,
+          ownerClass: player.class,
+          spellId: abilityId,
+          homing: spell.homing,
+          lifesteal: spell.lifesteal,
+          range: spell.range,
+          distanceTraveled: 0,
+        };
+        gameState.projectiles.set(proj.id, proj);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'apocalypse') {
+        // Apocalypse - massive void explosion
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= spell.damage;
+            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('apocalypse', { x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#8b00ff', 60);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
       }
       
       break;
@@ -4522,12 +4906,17 @@ io.on('connection', (socket) => {
           });
         }
         
-        // Transport to dungeon
-        player.x = 450;  // Center of dungeon corridor
-        player.y = 200;  // Near entrance
+        // Store pre-dungeon position
+        player.preDungeonX = player.x;
+        player.preDungeonY = player.y;
+        
+        // Transport to dungeon - starts in entrance chamber
+        player.x = 400;  // Center of entrance chamber
+        player.y = 300;  // Near entrance
         player.inDungeon = true;
         player.dungeonProgress = 0;
         player.dungeonWaveSpawned = 0;
+        player.dungeonRoom = 0; // Track which room they're in
         
         // Spawn dragon boss at the end
         spawnDragonBoss();
@@ -4553,14 +4942,16 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Exit Dungeon (return to sanctuary)
+  // Exit Dungeon (return to previous position or sanctuary)
   socket.on('exitDungeon', () => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id && player.inDungeon) {
-        player.x = 3000;
-        player.y = 2500;
+        // Return to where they were before entering, or sanctuary if not stored
+        player.x = player.preDungeonX || 3000;
+        player.y = player.preDungeonY || 2500;
         player.inDungeon = false;
         player.dungeonProgress = 0;
+        player.dungeonRoom = 0;
         
         socket.emit('exitedDungeon', {
           x: player.x,
