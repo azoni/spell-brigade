@@ -1545,8 +1545,8 @@ app.get('/leaderboard', (req, res) => {
 // ===========================================
 // AUTHENTICATION SYSTEM
 // ===========================================
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 // Users database (separate from player characters)
 const usersDb = {};
@@ -2147,15 +2147,34 @@ function spawnZoneBoss(zoneId) {
   const zone = ZONES[zoneId];
   if (!zone || zone.isSafe) return null;
   
-  // Use polygon-based spawn position
-  const pos = getRandomPointInZone(zoneId);
+  // Sanctuary center for distance check
+  const sanctuaryCenter = { x: 3500, y: 3000 };
+  const minDistanceFromSanctuary = 500; // Bosses must be at least 500 units from sanctuary
+  
+  // Try to find a valid spawn position (max 10 attempts)
+  let pos = null;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidatePos = getRandomPointInZone(zoneId);
+    if (!candidatePos) continue;
+    
+    const distToSanctuary = Math.sqrt(
+      Math.pow(candidatePos.x - sanctuaryCenter.x, 2) + 
+      Math.pow(candidatePos.y - sanctuaryCenter.y, 2)
+    );
+    
+    if (distToSanctuary >= minDistanceFromSanctuary) {
+      pos = candidatePos;
+      break;
+    }
+  }
+  
   if (!pos) return null;
   
   // Spawn the boss
   const bossId = spawnEnemy(bossType, pos, 0, 1);
   if (bossId) {
     gameState.zoneBosses.set(zoneId, bossId);
-    console.log(`👑 Zone boss spawned: ${template.name} in ${zone.name}`);
+    console.log(`Zone boss spawned: ${template.name} in ${zone.name}`);
   }
   
   return bossId;
@@ -4211,15 +4230,20 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Validate class - voidlord requires admin key
+    // Check if azoni account - auto-grant admin
+    const isAzoniAccount = playerName?.toLowerCase() === 'azoni';
+    
+    // Validate class - voidlord requires admin key or azoni account
     let validatedClass = playerClass;
+    let isAdmin = false;
     if (playerClass === 'voidlord') {
       const correctKey = process.env.ADMIN_KEY || 'azoni-voidlord-2026';
-      if (adminKey !== correctKey) {
-        validatedClass = 'pyromancer'; // Default if wrong key
-        console.log(`⚠️ Invalid admin key attempt from ${playerName}`);
+      if (adminKey === correctKey || isAzoniAccount) {
+        isAdmin = true;
+        console.log(`Admin ${playerName} authenticated as Void Lord`);
       } else {
-        console.log(`👑 Admin ${playerName} authenticated as Void Lord`);
+        validatedClass = 'pyromancer'; // Default if wrong key
+        console.log(`Invalid admin key attempt from ${playerName}`);
       }
     }
     const classData = CLASSES[validatedClass] || CLASSES.pyromancer;
@@ -4280,6 +4304,8 @@ io.on('connection', (socket) => {
       animFrame: 0,
       animTime: 0,
       createdAt: saved?.createdAt || new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      isAdmin: isAdmin || isAzoniAccount,
     };
 
     gameState.players.set(id, player);
