@@ -4,6 +4,8 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import admin from 'firebase-admin';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 // ===========================================
 // CONFIG
@@ -1545,8 +1547,6 @@ app.get('/leaderboard', (req, res) => {
 // ===========================================
 // AUTHENTICATION SYSTEM
 // ===========================================
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 
 // Users database (separate from player characters)
 const usersDb = {};
