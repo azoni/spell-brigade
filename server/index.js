@@ -1545,8 +1545,8 @@ app.get('/leaderboard', (req, res) => {
 // ===========================================
 // AUTHENTICATION SYSTEM
 // ===========================================
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 // Users database (separate from player characters)
 const usersDb = {};
