@@ -666,6 +666,210 @@ const SPELLS = {
     isAoe: true,
     canHitPlayers: true,
   },
+  
+  // === PYROMANCER CLASS ABILITIES ===
+  flameShield: {
+    id: 'flameShield',
+    name: 'Flame Shield',
+    damage: 15,
+    cooldown: 12000,
+    range: 0,
+    speed: 0,
+    radius: 80,
+    color: '#ff6b35',
+    isAoe: true,
+    duration: 5000,
+    class: 'pyromancer',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Surround yourself with flames, damaging nearby enemies',
+  },
+  meteorStrike: {
+    id: 'meteorStrike',
+    name: 'Meteor Strike',
+    damage: 80,
+    cooldown: 18000,
+    range: 350,
+    speed: 0,
+    radius: 100,
+    color: '#ff4500',
+    isAoe: true,
+    delay: 1500,
+    class: 'pyromancer',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Call down a devastating meteor from the sky',
+  },
+  inferno: {
+    id: 'inferno',
+    name: 'Inferno',
+    damage: 150,
+    cooldown: 45000,
+    range: 0,
+    speed: 0,
+    radius: 250,
+    color: '#ff0000',
+    isAoe: true,
+    class: 'pyromancer',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Unleash a massive explosion of fire around you',
+  },
+
+  // === CRYOMANCER CLASS ABILITIES ===
+  frostNova: {
+    id: 'frostNova',
+    name: 'Frost Nova',
+    damage: 25,
+    cooldown: 10000,
+    range: 0,
+    speed: 0,
+    radius: 120,
+    color: '#00ffff',
+    isAoe: true,
+    freezeDuration: 3000,
+    class: 'cryomancer',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Freeze all nearby enemies in place',
+  },
+  iceLance: {
+    id: 'iceLance',
+    name: 'Ice Lance',
+    damage: 60,
+    cooldown: 15000,
+    range: 500,
+    speed: 700,
+    radius: 10,
+    color: '#00ccff',
+    trailColor: '#87ceeb',
+    piercing: true,
+    slowEffect: 0.8,
+    slowDuration: 4000,
+    class: 'cryomancer',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Pierce through enemies with a massive ice shard',
+  },
+  glacialStorm: {
+    id: 'glacialStorm',
+    name: 'Glacial Storm',
+    damage: 40,
+    cooldown: 40000,
+    range: 300,
+    speed: 0,
+    radius: 200,
+    color: '#b3e5fc',
+    isAoe: true,
+    duration: 6000,
+    freezeDuration: 2000,
+    class: 'cryomancer',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Summon a devastating blizzard that freezes all enemies',
+  },
+
+  // === ARCANIST CLASS ABILITIES ===
+  blink: {
+    id: 'blink',
+    name: 'Blink',
+    damage: 0,
+    cooldown: 8000,
+    range: 200,
+    speed: 0,
+    radius: 0,
+    color: '#9b5de5',
+    isTeleport: true,
+    class: 'arcanist',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Instantly teleport a short distance',
+  },
+  arcaneBarrage: {
+    id: 'arcaneBarrage',
+    name: 'Arcane Barrage',
+    damage: 30,
+    cooldown: 14000,
+    range: 400,
+    speed: 500,
+    radius: 8,
+    color: '#e056fd',
+    trailColor: '#9b5de5',
+    homing: true,
+    projectileCount: 5,
+    class: 'arcanist',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Launch multiple homing arcane missiles',
+  },
+  timeWarp: {
+    id: 'timeWarp',
+    name: 'Time Warp',
+    damage: 0,
+    cooldown: 60000,
+    range: 0,
+    speed: 0,
+    radius: 0,
+    color: '#d4af37',
+    duration: 8000,
+    speedBoost: 1.5,
+    cooldownReduction: 0.5,
+    class: 'arcanist',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Warp time - gain massive speed and cooldown reduction',
+  },
+
+  // === STORMCALLER CLASS ABILITIES ===
+  staticField: {
+    id: 'staticField',
+    name: 'Static Field',
+    damage: 20,
+    cooldown: 9000,
+    range: 0,
+    speed: 0,
+    radius: 100,
+    color: '#ffff00',
+    isAoe: true,
+    stunDuration: 1000,
+    class: 'stormcaller',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Shock nearby enemies with electricity',
+  },
+  ballLightning: {
+    id: 'ballLightning',
+    name: 'Ball Lightning',
+    damage: 100,
+    cooldown: 16000,
+    range: 500,
+    speed: 150,
+    radius: 30,
+    color: '#ffd700',
+    trailColor: '#ffff00',
+    piercing: true,
+    chainLightning: true,
+    class: 'stormcaller',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Send a slow but devastating ball of lightning',
+  },
+  thunderGod: {
+    id: 'thunderGod',
+    name: 'Thunder God',
+    damage: 200,
+    cooldown: 50000,
+    range: 0,
+    speed: 0,
+    radius: 350,
+    color: '#ffffff',
+    isAoe: true,
+    chainCount: 8,
+    class: 'stormcaller',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Call upon the fury of storms to devastate all enemies',
+  },
 };
 
 // ===========================================
@@ -1185,6 +1389,9 @@ app.use(express.json());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
+  // Increase timeouts for better tab inactivity handling
+  pingTimeout: 1800000,   // 30 minutes
+  pingInterval: 60000,    // 1 minute
 });
 
 // Health check / stats endpoint
@@ -2318,6 +2525,7 @@ function gameTick() {
               // Deal damage in area
               for (const player of gameState.players.values()) {
                 if (player.health <= 0) continue;
+                if (player.invincible) continue; // Admin invincibility
                 if (distance({ x: mx, y: my }, player) < 60) {
                   player.health -= 40;
                   io.to(player.socketId).emit('damaged', { amount: 40, fromX: mx, fromY: my });
@@ -2356,6 +2564,7 @@ function gameTick() {
               if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
               
               if (angleDiff < coneAngle / 2) {
+                if (player.invincible) continue; // Admin invincibility
                 player.health -= 35;
                 player.frozenUntil = now + 2000;
                 io.to(player.socketId).emit('damaged', { amount: 35, fromX: enemy.x, fromY: enemy.y });
@@ -2398,6 +2607,7 @@ function gameTick() {
             clearInterval(pullInterval);
             for (const player of gameState.players.values()) {
               if (player.health <= 0) continue;
+              if (player.invincible) continue; // Admin invincibility
               if (distance(enemy, player) < explodeRadius) {
                 player.health -= 60;
                 io.to(player.socketId).emit('damaged', { amount: 60, fromX: enemy.x, fromY: enemy.y });
@@ -2464,6 +2674,7 @@ function gameTick() {
                 if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
                 
                 if (angleDiff < coneAngle / 2) {
+                  if (player.invincible) continue; // Admin invincibility
                   player.health -= 50 + (enemy.phase - 1) * 15;
                   io.to(player.socketId).emit('damaged', { amount: 50, fromX: enemy.x, fromY: enemy.y });
                   spawnDamageNumber(player.x, player.y - 20, 50);
@@ -2498,6 +2709,7 @@ function gameTick() {
           
           for (const player of gameState.players.values()) {
             if (player.health <= 0 || !player.inDungeon) continue;
+            if (player.invincible) continue; // Admin invincibility
             if (distance(enemy, player) < 150) {
               player.health -= 40 + (enemy.phase - 1) * 10;
               io.to(player.socketId).emit('damaged', { amount: 40, fromX: enemy.x, fromY: enemy.y });
@@ -2660,8 +2872,8 @@ function gameTick() {
       
       const collisionDist = enemy.radius + 16; // player radius
       if (canAttack && nearestDist < collisionDist && now - enemy.lastAttack > 500) {
-        // Check if player is invulnerable
-        if (!nearestPlayer.invulnerableUntil || nearestPlayer.invulnerableUntil < now) {
+        // Check if player is invulnerable or invincible
+        if ((!nearestPlayer.invulnerableUntil || nearestPlayer.invulnerableUntil < now) && !nearestPlayer.invincible) {
           nearestPlayer.health -= enemy.damage;
           enemy.lastAttack = now;
           
@@ -3216,6 +3428,7 @@ function checkEnemyDeath(enemy, killerId) {
       // Damage nearby players
       for (const player of gameState.players.values()) {
         if (player.health <= 0) continue;
+        if (player.invincible) continue; // Admin invincibility
         const dist = distance(enemy, player);
         if (dist < explosionRadius) {
           const dmgMultiplier = 1 - (dist / explosionRadius);
@@ -3900,6 +4113,336 @@ io.on('connection', (socket) => {
       }
     }
   });
+  
+  // Toggle Invincibility (Admin Voidlord only)
+  socket.on('toggleInvincible', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        // Only admin voidlord can toggle invincibility
+        if (player.class === 'voidlord' && player.isAdmin) {
+          player.invincible = !player.invincible;
+          socket.emit('invincibleToggled', { enabled: player.invincible });
+          console.log(`✨ ${player.name} Invincibility: ${player.invincible ? 'ON' : 'OFF'}`);
+        }
+        break;
+      }
+    }
+  });
+
+  // Class Ability (hotkey 1, 2, 3)
+  socket.on('classAbility', ({ abilitySlot, targetX, targetY }) => {
+    const tx = Number.isFinite(targetX) ? targetX : null;
+    const ty = Number.isFinite(targetY) ? targetY : null;
+    const now = Date.now();
+    
+    for (const player of gameState.players.values()) {
+      if (player.socketId !== socket.id || player.health <= 0) continue;
+      
+      // Find the ability for this slot and class
+      const abilityMap = {
+        pyromancer: { 1: 'flameShield', 2: 'meteorStrike', 3: 'inferno' },
+        cryomancer: { 1: 'frostNova', 2: 'iceLance', 3: 'glacialStorm' },
+        arcanist: { 1: 'blink', 2: 'arcaneBarrage', 3: 'timeWarp' },
+        stormcaller: { 1: 'staticField', 2: 'ballLightning', 3: 'thunderGod' },
+      };
+      
+      const levelReqs = { 1: 10, 2: 20, 3: 30 };
+      const abilityId = abilityMap[player.class]?.[abilitySlot];
+      
+      if (!abilityId) {
+        socket.emit('abilityError', { message: 'Invalid ability slot' });
+        break;
+      }
+      
+      const spell = SPELLS[abilityId];
+      if (!spell) break;
+      
+      // Check level requirement
+      if (player.level < levelReqs[abilitySlot]) {
+        socket.emit('abilityError', { message: `Requires level ${levelReqs[abilitySlot]}` });
+        break;
+      }
+      
+      // Check cooldown
+      const lastUse = player[`lastAbility${abilitySlot}`] || 0;
+      if (now - lastUse < spell.cooldown) {
+        socket.emit('abilityCooldown', { 
+          slot: abilitySlot, 
+          remaining: spell.cooldown - (now - lastUse) 
+        });
+        break;
+      }
+      
+      player[`lastAbility${abilitySlot}`] = now;
+      
+      // Execute ability based on type
+      if (abilityId === 'flameShield') {
+        // Flame Shield - damage aura around self
+        player.flameShieldUntil = now + spell.duration;
+        io.emit('flameShieldStart', { playerId: player.id, x: player.x, y: player.y, duration: spell.duration });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+        // Pulse damage every 500ms
+        const pulseInterval = setInterval(() => {
+          if (Date.now() > player.flameShieldUntil || player.health <= 0) {
+            clearInterval(pulseInterval);
+            return;
+          }
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (distance(enemy, player) < spell.radius) {
+              enemy.health -= spell.damage;
+              spawnDamageNumber(enemy.x, enemy.y - 10, spell.damage);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+        }, 500);
+        
+      } else if (abilityId === 'meteorStrike') {
+        // Meteor Strike - delayed AOE at target
+        const meteorX = tx ?? player.x;
+        const meteorY = ty ?? player.y;
+        io.emit('meteorWarning', { x: meteorX, y: meteorY, radius: spell.radius, delay: spell.delay, color: '#ff4500' });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+        setTimeout(() => {
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (distance(enemy, { x: meteorX, y: meteorY }) < spell.radius) {
+              enemy.health -= spell.damage;
+              spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          io.emit('explosion', { x: meteorX, y: meteorY, radius: spell.radius, color: '#ff4500' });
+          spawnParticles(meteorX, meteorY, '#ff4500', 25);
+        }, spell.delay);
+        
+      } else if (abilityId === 'inferno') {
+        // Inferno - massive AOE around self
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= spell.damage;
+            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('inferno', { x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#ff0000', 40);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'frostNova') {
+        // Frost Nova - freeze nearby enemies
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= spell.damage;
+            enemy.frozenUntil = now + spell.freezeDuration;
+            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('frostNova', { x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#00ffff', 25);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'iceLance') {
+        // Ice Lance - piercing projectile
+        const dx = (tx ?? player.x + 100) - player.x;
+        const dy = (ty ?? player.y) - player.y;
+        const dir = normalize({ x: dx, y: dy });
+        
+        const proj = {
+          id: uuidv4(),
+          x: player.x,
+          y: player.y,
+          vx: dir.x * spell.speed,
+          vy: dir.y * spell.speed,
+          radius: spell.radius,
+          damage: spell.damage,
+          color: spell.color,
+          trailColor: spell.trailColor,
+          ownerId: player.id,
+          ownerClass: player.class,
+          spellId: abilityId,
+          piercing: spell.piercing,
+          hitEnemies: new Set(),
+          slowEffect: spell.slowEffect,
+          slowDuration: spell.slowDuration,
+          range: spell.range,
+          distanceTraveled: 0,
+        };
+        gameState.projectiles.set(proj.id, proj);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'glacialStorm') {
+        // Glacial Storm - large persistent blizzard
+        const stormX = tx ?? player.x;
+        const stormY = ty ?? player.y;
+        io.emit('glacialStorm', { x: stormX, y: stormY, radius: spell.radius, duration: spell.duration });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+        const stormEnd = now + spell.duration;
+        const stormInterval = setInterval(() => {
+          if (Date.now() > stormEnd) {
+            clearInterval(stormInterval);
+            return;
+          }
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (distance(enemy, { x: stormX, y: stormY }) < spell.radius) {
+              enemy.health -= spell.damage / 6; // Tick damage
+              enemy.frozenUntil = Math.max(enemy.frozenUntil || 0, Date.now() + spell.freezeDuration);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+        }, 1000);
+        
+      } else if (abilityId === 'blink') {
+        // Blink - teleport
+        const blinkDist = Math.min(spell.range, distance(player, { x: tx ?? player.x, y: ty ?? player.y }));
+        const dir = normalize({ x: (tx ?? player.x + 100) - player.x, y: (ty ?? player.y) - player.y });
+        const newX = clamp(player.x + dir.x * blinkDist, 50, WORLD.width - 50);
+        const newY = clamp(player.y + dir.y * blinkDist, 50, WORLD.height - 50);
+        
+        io.emit('blink', { playerId: player.id, fromX: player.x, fromY: player.y, toX: newX, toY: newY });
+        player.x = newX;
+        player.y = newY;
+        spawnParticles(newX, newY, '#9b5de5', 15);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'arcaneBarrage') {
+        // Arcane Barrage - multiple homing missiles
+        for (let i = 0; i < spell.projectileCount; i++) {
+          setTimeout(() => {
+            if (player.health <= 0) return;
+            const spreadAngle = (i - 2) * 0.2;
+            const dx = (tx ?? player.x + 100) - player.x;
+            const dy = (ty ?? player.y) - player.y;
+            const baseAngle = Math.atan2(dy, dx) + spreadAngle;
+            
+            const proj = {
+              id: uuidv4(),
+              x: player.x,
+              y: player.y,
+              vx: Math.cos(baseAngle) * spell.speed,
+              vy: Math.sin(baseAngle) * spell.speed,
+              radius: spell.radius,
+              damage: spell.damage,
+              color: spell.color,
+              trailColor: spell.trailColor,
+              ownerId: player.id,
+              ownerClass: player.class,
+              spellId: abilityId,
+              homing: spell.homing,
+              range: spell.range,
+              distanceTraveled: 0,
+            };
+            gameState.projectiles.set(proj.id, proj);
+          }, i * 100);
+        }
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'timeWarp') {
+        // Time Warp - speed and cooldown buff
+        player.timeWarpUntil = now + spell.duration;
+        player.speedMultiplier = spell.speedBoost;
+        player.cooldownMultiplier = spell.cooldownReduction;
+        io.emit('timeWarp', { playerId: player.id, duration: spell.duration });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+        setTimeout(() => {
+          player.speedMultiplier = 1;
+          player.cooldownMultiplier = 1;
+        }, spell.duration);
+        
+      } else if (abilityId === 'staticField') {
+        // Static Field - AOE stun
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= spell.damage;
+            enemy.frozenUntil = now + spell.stunDuration;
+            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('staticField', { x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#ffff00', 20);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'ballLightning') {
+        // Ball Lightning - slow powerful projectile
+        const dx = (tx ?? player.x + 100) - player.x;
+        const dy = (ty ?? player.y) - player.y;
+        const dir = normalize({ x: dx, y: dy });
+        
+        const proj = {
+          id: uuidv4(),
+          x: player.x,
+          y: player.y,
+          vx: dir.x * spell.speed,
+          vy: dir.y * spell.speed,
+          radius: spell.radius,
+          damage: spell.damage,
+          color: spell.color,
+          trailColor: spell.trailColor,
+          ownerId: player.id,
+          ownerClass: player.class,
+          spellId: abilityId,
+          piercing: spell.piercing,
+          hitEnemies: new Set(),
+          chainLightning: spell.chainLightning,
+          range: spell.range,
+          distanceTraveled: 0,
+        };
+        gameState.projectiles.set(proj.id, proj);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        
+      } else if (abilityId === 'thunderGod') {
+        // Thunder God - massive chain lightning
+        let hitCount = 0;
+        const hitEnemies = new Set();
+        let lastX = player.x, lastY = player.y;
+        
+        const chainNext = () => {
+          if (hitCount >= spell.chainCount) return;
+          
+          let nearestEnemy = null;
+          let nearestDist = 300;
+          
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0 || hitEnemies.has(enemy.id)) continue;
+            const dist = distance(enemy, { x: lastX, y: lastY });
+            if (dist < nearestDist) {
+              nearestDist = dist;
+              nearestEnemy = enemy;
+            }
+          }
+          
+          if (nearestEnemy) {
+            hitEnemies.add(nearestEnemy.id);
+            nearestEnemy.health -= spell.damage;
+            io.emit('lightningBolt', { fromX: lastX, fromY: lastY, toX: nearestEnemy.x, toY: nearestEnemy.y });
+            spawnDamageNumber(nearestEnemy.x, nearestEnemy.y - 20, spell.damage);
+            checkEnemyDeath(nearestEnemy, player.id);
+            lastX = nearestEnemy.x;
+            lastY = nearestEnemy.y;
+            hitCount++;
+            setTimeout(chainNext, 100);
+          }
+        };
+        
+        io.emit('thunderGod', { x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#ffffff', 50);
+        chainNext();
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      }
+      
+      break;
+    }
+  });
 
   // NPC Interaction
   socket.on('interactNpc', ({ npcId }) => {
@@ -4054,6 +4597,16 @@ io.on('connection', (socket) => {
       });
     } else {
       socket.emit('playerData', { player: null });
+    }
+  });
+  
+  // Heartbeat handler - keeps connection alive and updates lastActivity
+  socket.on('heartbeat', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        player.lastActivity = Date.now();
+        break;
+      }
     }
   });
 
