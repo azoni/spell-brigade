@@ -1628,8 +1628,9 @@ function createProjectile(player, spell, targetX, targetY, targetPlayerId = null
   }
   
   // Check if this player can hit other players (PvP)
+  // Only allow PvP damage if class canPvP AND player has pvpEnabled
   const classData = CLASSES[player.class];
-  const canPvP = classData?.canPvP || false;
+  const canPvP = (classData?.canPvP && player.pvpEnabled === true) || false;
   
   const proj = {
     id,
@@ -1654,7 +1655,7 @@ function createProjectile(player, spell, targetX, targetY, targetPlayerId = null
     targetId: null,
     targetPlayerId: targetPlayerId, // Track if targeting a specific player
     createdAt: Date.now(),
-    canHitPlayers: canPvP || spell.canHitPlayers || false,
+    canHitPlayers: canPvP || (spell.canHitPlayers && player.pvpEnabled === true) || false,
     piercing: spell.piercing || false,
   };
   
@@ -1797,8 +1798,8 @@ function gameTick() {
               }
             }
 
-            // Voidlord can also target other players (PvP)
-            if (classData.canPvP) {
+            // Voidlord can also target other players (only if PvP is enabled)
+            if (classData.canPvP && player.pvpEnabled === true) {
               for (const otherPlayer of gameState.players.values()) {
                 if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
                 const dist = distance(player, otherPlayer);
@@ -3107,33 +3108,35 @@ io.on('connection', (socket) => {
               }
             }
             
-            // Damage other players (PvP)
-            for (const otherPlayer of gameState.players.values()) {
-              if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
-              const dist = distance(otherPlayer, { x: riftX, y: riftY });
-              if (dist < ult.radius) {
-                // Pull toward center
-                const pullStrength = (1 - dist / ult.radius) * ult.pullForce * 0.05;
-                const dx = riftX - otherPlayer.x;
-                const dy = riftY - otherPlayer.y;
-                const mag = Math.sqrt(dx * dx + dy * dy) || 1;
-                otherPlayer.x += (dx / mag) * pullStrength;
-                otherPlayer.y += (dy / mag) * pullStrength;
-                
-                // Damage (less frequent)
-                if (ticks % 5 === 0) {
-                  otherPlayer.health -= damagePerTick * 2;
-                  spawnDamageNumber(otherPlayer.x, otherPlayer.y - 20, Math.round(damagePerTick * 2));
+            // Damage other players (PvP) - only if pvpEnabled
+            if (player.pvpEnabled === true) {
+              for (const otherPlayer of gameState.players.values()) {
+                if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
+                const dist = distance(otherPlayer, { x: riftX, y: riftY });
+                if (dist < ult.radius) {
+                  // Pull toward center
+                  const pullStrength = (1 - dist / ult.radius) * ult.pullForce * 0.05;
+                  const dx = riftX - otherPlayer.x;
+                  const dy = riftY - otherPlayer.y;
+                  const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+                  otherPlayer.x += (dx / mag) * pullStrength;
+                  otherPlayer.y += (dy / mag) * pullStrength;
                   
-                  const otherSocket = io.sockets.sockets.get(otherPlayer.socketId);
-                  if (otherSocket) {
-                    otherSocket.emit('damaged', { amount: damagePerTick * 2 });
-                  }
-                  
-                  if (otherPlayer.health <= 0) {
-                    otherPlayer.deaths = (otherPlayer.deaths || 0) + 1;
+                  // Damage (less frequent)
+                  if (ticks % 5 === 0) {
+                    otherPlayer.health -= damagePerTick * 2;
+                    spawnDamageNumber(otherPlayer.x, otherPlayer.y - 20, Math.round(damagePerTick * 2));
+                    
+                    const otherSocket = io.sockets.sockets.get(otherPlayer.socketId);
                     if (otherSocket) {
-                      otherSocket.emit('died', { killedBy: 'Void Lord', deathMessage: 'Consumed by the void!' });
+                      otherSocket.emit('damaged', { amount: damagePerTick * 2 });
+                    }
+                    
+                    if (otherPlayer.health <= 0) {
+                      otherPlayer.deaths = (otherPlayer.deaths || 0) + 1;
+                      if (otherSocket) {
+                        otherSocket.emit('died', { killedBy: 'Void Lord', deathMessage: 'Consumed by the void!' });
+                      }
                     }
                   }
                 }
@@ -3353,6 +3356,21 @@ io.on('connection', (socket) => {
       if (player.socketId === socket.id) {
         player.autoAttack = player.autoAttack === false ? true : false;
         socket.emit('autoAttackToggled', { enabled: player.autoAttack !== false });
+        break;
+      }
+    }
+  });
+
+  // Toggle PvP (Voidlord only)
+  socket.on('togglePvP', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        // Only voidlord can toggle PvP
+        if (player.class === 'voidlord') {
+          player.pvpEnabled = player.pvpEnabled === true ? false : true;
+          socket.emit('pvpToggled', { enabled: player.pvpEnabled === true });
+          console.log(`👹 ${player.name} PvP: ${player.pvpEnabled ? 'ON' : 'OFF'}`);
+        }
         break;
       }
     }
