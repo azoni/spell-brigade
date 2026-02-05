@@ -6284,20 +6284,28 @@ io.on('connection', (socket) => {
   // AI WIZARD CREATOR (Admin only)
   // ===========================================
   socket.on('generateWizard', async ({ prompt, sessionToken }) => {
+    console.log(`🧙 generateWizard called - socket: ${socket.id}, socketIsAdmin: ${socket.isAdmin}, sessionToken: ${sessionToken ? sessionToken.slice(0,8) + '...' : 'NONE'}`);
+    
     // Primary check: socket-level or player-level admin
     let isAdmin = isAdminSocket(socket.id);
     
     // Fallback: verify via session token directly
     if (!isAdmin && sessionToken && sessionsDb[sessionToken]) {
       const session = sessionsDb[sessionToken];
+      console.log(`🧙 Session fallback - isGuest: ${session.isGuest}, userId: ${session.userId}`);
       if (!session.isGuest && session.userId) {
         const user = await loadUserFromDb(session.userId);
+        console.log(`🧙 Session user: ${user?.username}`);
         if (user?.username?.toLowerCase() === 'azoni') {
           isAdmin = true;
-          socket.isAdmin = true; // Fix the socket for future calls
+          socket.isAdmin = true;
           console.log(`🔑 generateWizard: admin verified via session fallback`);
         }
       }
+    } else if (!isAdmin && sessionToken) {
+      console.log(`🧙 Session token provided but NOT in sessionsDb. Active sessions: ${Object.keys(sessionsDb).length}`);
+    } else if (!isAdmin) {
+      console.log(`🧙 No session token provided in payload`);
     }
     
     if (!isAdmin) {
