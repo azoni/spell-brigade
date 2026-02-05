@@ -4648,14 +4648,27 @@ io.on('connection', (socket) => {
 
   // Pre-join admin authentication (so wizard creator works from title screen)
   socket.on('authenticateAdmin', async ({ sessionToken }) => {
-    if (!sessionToken || !sessionsDb[sessionToken]) return;
+    console.log(`🔑 authenticateAdmin attempt from ${socket.id}, token: ${sessionToken ? 'present' : 'missing'}`);
+    if (!sessionToken || !sessionsDb[sessionToken]) {
+      console.log(`🔑 authenticateAdmin failed: ${!sessionToken ? 'no token' : 'token not in sessionsDb'}`);
+      socket.emit('adminAuthenticated', { success: false });
+      return;
+    }
     const session = sessionsDb[sessionToken];
-    if (session.isGuest || !session.userId) return;
+    if (session.isGuest || !session.userId) {
+      console.log(`🔑 authenticateAdmin failed: ${session.isGuest ? 'guest session' : 'no userId'}`);
+      socket.emit('adminAuthenticated', { success: false });
+      return;
+    }
     const user = await loadUserFromDb(session.userId);
     if (user?.username?.toLowerCase() === 'azoni') {
       socket.isAdmin = true;
+      socket.adminSessionToken = sessionToken; // Store for later verification
       socket.emit('adminAuthenticated', { success: true });
-      console.log(`🔑 Socket ${socket.id} pre-authenticated as admin`);
+      console.log(`🔑 Socket ${socket.id} pre-authenticated as admin (${user.username})`);
+    } else {
+      console.log(`🔑 authenticateAdmin failed: user is ${user?.username || 'unknown'}, not azoni`);
+      socket.emit('adminAuthenticated', { success: false });
     }
   });
 
@@ -6270,8 +6283,25 @@ io.on('connection', (socket) => {
   // ===========================================
   // AI WIZARD CREATOR (Admin only)
   // ===========================================
-  socket.on('generateWizard', async ({ prompt }) => {
-    if (!isAdminSocket(socket.id)) {
+  socket.on('generateWizard', async ({ prompt, sessionToken }) => {
+    // Primary check: socket-level or player-level admin
+    let isAdmin = isAdminSocket(socket.id);
+    
+    // Fallback: verify via session token directly
+    if (!isAdmin && sessionToken && sessionsDb[sessionToken]) {
+      const session = sessionsDb[sessionToken];
+      if (!session.isGuest && session.userId) {
+        const user = await loadUserFromDb(session.userId);
+        if (user?.username?.toLowerCase() === 'azoni') {
+          isAdmin = true;
+          socket.isAdmin = true; // Fix the socket for future calls
+          console.log(`🔑 generateWizard: admin verified via session fallback`);
+        }
+      }
+    }
+    
+    if (!isAdmin) {
+      console.log(`🔑 generateWizard denied for socket ${socket.id} - not admin`);
       socket.emit('wizardGenerateError', { message: 'AI wizard creation is admin-only during testing.' });
       return;
     }
