@@ -100,9 +100,9 @@ const ZONES = {
     isDungeon: true,
     polygon: [
       { x: 0, y: 0 },
-      { x: 800, y: 0 },
-      { x: 800, y: 3200 },
-      { x: 0, y: 3200 },
+      { x: 1800, y: 0 },
+      { x: 1800, y: 6500 },
+      { x: 0, y: 6500 },
     ],
   },
   meadow: {
@@ -2322,9 +2322,17 @@ function spawnEnemy(forceType = null, position = null, levelBoost = 0, xpMultipl
     }
   }
   
-  // Boss spawn in abyss
+  // Boss spawn chance - use zone-specific boss type (NOT dungeon dragon!)
   if (zone?.bossChance && Math.random() < zone.bossChance && playerCount >= 2) {
-    type = 'boss_dragon';
+    // Use zone boss type if available
+    const zoneBossType = ZONE_BOSS_TYPES[zone.id];
+    if (zoneBossType) {
+      // Check if this zone boss already exists - prevent duplicates
+      const existingBossId = gameState.zoneBosses.get(zone.id);
+      if (!existingBossId || !gameState.enemies.has(existingBossId)) {
+        type = zoneBossType;
+      }
+    }
   }
   
   const template = ENEMY_TYPES[type];
@@ -3909,27 +3917,39 @@ function gameTick() {
       let newX = enemy.x + Math.cos(enemy.wanderAngle) * wanderSpeed * dt;
       let newY = enemy.y + Math.sin(enemy.wanderAngle) * wanderSpeed * dt;
       
-      // Keep in zone (all enemies, not just bosses)
-      if (enemyZone?.polygon) {
-        if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
-          // Turn around instead of leaving zone
+      // Dungeon enemies use different bounds
+      if (enemyInDungeon) {
+        // Dungeon bounds: x: 0-1800, y: 0-6500
+        if (newX < 50 || newX > 1750 || newY < 50 || newY > 6450) {
           enemy.wanderAngle = enemy.wanderAngle + Math.PI + (Math.random() - 0.5);
           newX = enemy.x;
           newY = enemy.y;
         }
-      }
-      
-      // Keep in bounds
-      enemy.x = clamp(newX, 50, WORLD.width - 50);
-      enemy.y = clamp(newY, 50, WORLD.height - 50);
-      
-      // Prevent enemies from getting too close to sanctuary (including buffer)
-      if (isTooCloseToSanctuary(enemy.x, enemy.y)) {
-        // Push back away from sanctuary
-        const pushDir = normalize({ x: enemy.x - SANCTUARY_CENTER.x, y: enemy.y - SANCTUARY_CENTER.y });
-        enemy.x = SANCTUARY_CENTER.x + pushDir.x * (SANCTUARY_RADIUS + SANCTUARY_BUFFER + 20);
-        enemy.y = SANCTUARY_CENTER.y + pushDir.y * (SANCTUARY_RADIUS + SANCTUARY_BUFFER + 20);
-        enemy.wanderAngle = Math.atan2(pushDir.y, pushDir.x); // Face away from sanctuary
+        enemy.x = Math.max(50, Math.min(1750, newX));
+        enemy.y = Math.max(50, Math.min(6450, newY));
+      } else {
+        // Keep in zone (world enemies only)
+        if (enemyZone?.polygon) {
+          if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
+            // Turn around instead of leaving zone
+            enemy.wanderAngle = enemy.wanderAngle + Math.PI + (Math.random() - 0.5);
+            newX = enemy.x;
+            newY = enemy.y;
+          }
+        }
+        
+        // Keep in bounds
+        enemy.x = clamp(newX, 50, WORLD.width - 50);
+        enemy.y = clamp(newY, 50, WORLD.height - 50);
+        
+        // Prevent enemies from getting too close to sanctuary (including buffer)
+        if (isTooCloseToSanctuary(enemy.x, enemy.y)) {
+          // Push back away from sanctuary
+          const pushDir = normalize({ x: enemy.x - SANCTUARY_CENTER.x, y: enemy.y - SANCTUARY_CENTER.y });
+          enemy.x = SANCTUARY_CENTER.x + pushDir.x * (SANCTUARY_RADIUS + SANCTUARY_BUFFER + 20);
+          enemy.y = SANCTUARY_CENTER.y + pushDir.y * (SANCTUARY_RADIUS + SANCTUARY_BUFFER + 20);
+          enemy.wanderAngle = Math.atan2(pushDir.y, pushDir.x); // Face away from sanctuary
+        }
       }
     }
     
@@ -3947,19 +3967,26 @@ function gameTick() {
         let newX = enemy.x + dir.x * currentSpeed * dt;
         let newY = enemy.y + dir.y * currentSpeed * dt;
         
-        // ALL enemies must stay in their zone (polygon check)
-        if (enemyZone?.polygon) {
-          if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
-            // Stay at current position if would leave zone
+        // Dungeon enemies use different bounds (not world zone polygons)
+        if (enemyInDungeon) {
+          // Dungeon bounds: x: 0-1800, y: 0-6500 (dragon lair area)
+          newX = Math.max(50, Math.min(1750, newX));
+          newY = Math.max(50, Math.min(6450, newY));
+        } else {
+          // ALL world enemies must stay in their zone (polygon check)
+          if (enemyZone?.polygon) {
+            if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
+              // Stay at current position if would leave zone
+              newX = enemy.x;
+              newY = enemy.y;
+            }
+          }
+          
+          // Also prevent entering sanctuary buffer
+          if (isTooCloseToSanctuary(newX, newY)) {
             newX = enemy.x;
             newY = enemy.y;
           }
-        }
-        
-        // Also prevent entering sanctuary buffer
-        if (isTooCloseToSanctuary(newX, newY)) {
-          newX = enemy.x;
-          newY = enemy.y;
         }
         
         enemy.x = newX;
@@ -4542,7 +4569,13 @@ function gameTick() {
     socket.emit('gameState', {
       tick: gameState.tickCount,
       timestamp: now,
-      players: [...gameState.players.values()].map(p => ({
+      players: [...gameState.players.values()]
+        .filter(p => {
+          // Only show players in same realm (dungeon vs world)
+          const pInDungeon = p.inDungeon || false;
+          return pInDungeon === playerInDungeon;
+        })
+        .map(p => ({
         id: p.id, name: p.name, class: p.class,
         x: Math.round(p.x), y: Math.round(p.y),
         health: Math.round(p.health), maxHealth: p.maxHealth,
@@ -4683,7 +4716,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey, sessionToken }) => {
+  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey, sessionToken, isCustomWizard }) => {
     // Prevent double-join from same socket
     for (const p of gameState.players.values()) {
       if (p.socketId === socket.id) {
@@ -4769,7 +4802,26 @@ io.on('connection', (socket) => {
         }
       }
     }
-    const classData = CLASSES[validatedClass] || CLASSES.pyromancer;
+    
+    // Handle custom wizard classes
+    let classData;
+    let customWizardData = null;
+    
+    if (isCustomWizard && playerClass && gameState.customWizards.has(playerClass)) {
+      // Custom wizard - load from stored wizards
+      customWizardData = gameState.customWizards.get(playerClass);
+      classData = customWizardData.classDef;
+      validatedClass = playerClass; // Use the custom classId
+      console.log(`🧙 Custom wizard join: ${playerName} as ${classData.name} (classId: ${playerClass})`);
+      
+      // Register custom spells globally so combat works
+      for (const [spellId, spellDef] of Object.entries(customWizardData.spellDefs)) {
+        SPELLS[spellId] = spellDef;
+      }
+    } else {
+      // Standard class
+      classData = CLASSES[validatedClass] || CLASSES.pyromancer;
+    }
 
     const id = saved?.id || uuidv4();
     const totalXp = saved?.totalXp || 0;
@@ -4828,6 +4880,19 @@ io.on('connection', (socket) => {
       lastLogin: new Date().toISOString(),
       isAdmin: isAdmin,
     };
+    
+    // Apply custom wizard properties if joining as custom wizard
+    if (customWizardData) {
+      player.isCustomWizard = true;
+      player.customClassId = validatedClass;
+      player.className = classData.name;
+      player.color = classData.color;
+      player.secondaryColor = classData.secondaryColor || classData.color;
+      player.spells = classData.spells;
+      player.dashAbility = classData.dashAbility;
+      player.ultimateAbility = classData.ultimateAbility;
+      console.log(`🧙 Applied custom wizard properties: ${classData.name}, spells: ${player.spells?.join(', ')}`);
+    }
     
     // Store guestId on player for ownership tracking
     if (sessionToken && sessionsDb[sessionToken]?.isGuest) {
@@ -6549,6 +6614,72 @@ io.on('connection', (socket) => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
         player.lastActivity = Date.now();
+        break;
+      }
+    }
+  });
+
+  // Handle explicit leave (player clicked "Return to Menu")
+  socket.on('leave', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        console.log(`🚪 Player leaving: ${player.name}`);
+        
+        // Exit dungeon if in one
+        if (player.inDungeon) {
+          player.inDungeon = false;
+          player.dungeonProgress = 0;
+          player.dungeonRoom = 0;
+          player.customDungeonId = null;
+          player.customDungeonConfig = null;
+        }
+        
+        // Save and remove
+        savePlayerToDb(player);
+        gameState.players.delete(player.id);
+        
+        // Broadcast leave
+        const leaveMsg = {
+          id: uuidv4(),
+          type: 'system',
+          text: `${player.name} has left the game`,
+          timestamp: Date.now(),
+        };
+        gameState.chatMessages.push(leaveMsg);
+        if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
+        io.emit('chatMessage', leaveMsg);
+        
+        break;
+      }
+    }
+  });
+
+  // Handle intentional leave (player wants to exit to menu)
+  socket.on('leave', () => {
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        console.log(`👋 Player leaving: ${player.name}`);
+        
+        // If in dungeon, exit properly
+        if (player.inDungeon) {
+          player.inDungeon = false;
+          player.x = player.preDungeonX || 3500;
+          player.y = player.preDungeonY || 3000;
+        }
+        
+        // Broadcast leave message
+        const leaveMsg = {
+          id: uuidv4(),
+          type: 'system',
+          text: `${player.name} has left the game`,
+          timestamp: Date.now(),
+        };
+        gameState.chatMessages.push(leaveMsg);
+        if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
+        io.emit('chatMessage', leaveMsg);
+        
+        savePlayerToDb(player);
+        gameState.players.delete(player.id);
         break;
       }
     }
