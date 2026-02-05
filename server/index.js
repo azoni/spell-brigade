@@ -6,7 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { generateDungeon, getDungeonRoom, getDungeonBounds, getRoomEnemies, getRoomCenterY, sanitizeDungeonForClient } from './dungeon-generator.js';
+import { generateDungeon, generateDungeonLLM, getDungeonRoom, getDungeonBounds, getRoomEnemies, getRoomCenterY, sanitizeDungeonForClient } from './dungeon-generator.js';
+import { generateWizard } from './wizard-generator.js';
+import { isLLMEnabled } from './openrouter.js';
 
 // ===========================================
 // CONFIG
@@ -1637,6 +1639,7 @@ const gameState = {
   npcs: new Map(),         // NPCs (id -> npc state)
   dungeonInstances: new Map(), // Player dungeon instances
   customDungeons: new Map(), // Custom AI-generated dungeons (id -> config)
+  customWizards: new Map(),  // Custom AI-generated wizard classes (classId -> { classDef, spellDefs })
   lastTick: Date.now(),
   tickCount: 0,
 };
@@ -2108,6 +2111,20 @@ app.post('/auth/logout', (req, res) => {
 // ===========================================
 function distance(a, b) {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
+
+// Helper: Find player by socket ID
+function getPlayerBySocket(socketId) {
+  for (const p of gameState.players.values()) {
+    if (p.socketId === socketId) return p;
+  }
+  return null;
+}
+
+// Helper: Check if socket belongs to admin
+function isAdminSocket(socketId) {
+  const p = getPlayerBySocket(socketId);
+  return p?.isAdmin === true;
 }
 
 function normalize(vec) {
@@ -4523,6 +4540,10 @@ function gameTick() {
         cooldownMultiplier: p.cooldownMultiplier || 1,
         attackSpeedMultiplier: p.attackSpeedMultiplier || 1,
         isAdmin: p.isAdmin || false,
+        isCustomWizard: p.isCustomWizard || false,
+        customColor: p.isCustomWizard ? p.color : undefined,
+        customSecondaryColor: p.isCustomWizard ? p.secondaryColor : undefined,
+        customClassName: p.isCustomWizard ? p.className : undefined,
       })),
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,
@@ -6134,43 +6155,148 @@ io.on('connection', (socket) => {
   // CUSTOM DUNGEON EVENTS
   // ===========================================
 
-  // Create a custom dungeon via prompt
-  socket.on('createCustomDungeon', ({ prompt }) => {
+  // Create a custom dungeon via prompt (admin = LLM, others = procedural)
+  socket.on('createCustomDungeon', async ({ prompt }) => {
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
       socket.emit('customDungeonError', { message: 'Please describe your dungeon idea (at least 3 characters).' });
       return;
     }
 
-    let player = null;
-    for (const p of gameState.players.values()) {
-      if (p.socketId === socket.id) { player = p; break; }
-    }
+    const player = getPlayerBySocket(socket.id);
     if (!player) return;
+    
+    // Admin-only for now (LLM gated)
+    if (!player.isAdmin) {
+      // Non-admin: use procedural
+      try {
+        const config = generateDungeon(prompt.trim(), player.name, player.id);
+        gameState.customDungeons.set(config.id, config);
+        if (gameState.customDungeons.size > 50) {
+          const oldest = [...gameState.customDungeons.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+          if (oldest) gameState.customDungeons.delete(oldest[0]);
+        }
+        socket.emit('customDungeonCreated', { dungeon: sanitizeDungeonForClient(config) });
+        io.emit('chat', { type: 'system', text: `🏗️ ${player.name} created a new dungeon: "${config.name}" [${config.difficulty}]` });
+      } catch (err) {
+        socket.emit('customDungeonError', { message: err.message || 'Failed to generate dungeon.' });
+      }
+      return;
+    }
 
+    // Admin: use LLM-powered generation
     try {
-      const config = generateDungeon(prompt.trim(), player.name, player.id);
+      socket.emit('customDungeonStatus', { message: '🤖 AI is designing your dungeon...' });
+      const config = await generateDungeonLLM(prompt.trim(), player.name, player.id);
       
-      // Store the dungeon
       gameState.customDungeons.set(config.id, config);
-      
-      // Cap stored dungeons to 50 (remove oldest)
       if (gameState.customDungeons.size > 50) {
-        const oldest = [...gameState.customDungeons.entries()]
-          .sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+        const oldest = [...gameState.customDungeons.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
         if (oldest) gameState.customDungeons.delete(oldest[0]);
       }
 
       socket.emit('customDungeonCreated', { dungeon: sanitizeDungeonForClient(config) });
       
-      io.emit('chat', {
-        type: 'system',
-        text: `🏗️ ${player.name} created a new dungeon: "${config.name}" [${config.difficulty}]`,
-      });
-
-      console.log(`🏗️ Custom dungeon created: "${config.name}" by ${player.name}`);
+      const aiTag = config.aiGenerated ? ' 🤖' : '';
+      io.emit('chat', { type: 'system', text: `🏗️ ${player.name} created a new dungeon: "${config.name}" [${config.difficulty}]${aiTag}` });
+      console.log(`🏗️ Custom dungeon created: "${config.name}" by ${player.name} (AI: ${!!config.aiGenerated})`);
     } catch (err) {
       socket.emit('customDungeonError', { message: err.message || 'Failed to generate dungeon.' });
     }
+  });
+
+  // ===========================================
+  // AI WIZARD CREATOR (Admin only)
+  // ===========================================
+  socket.on('generateWizard', async ({ prompt }) => {
+    if (!isAdminSocket(socket.id)) {
+      socket.emit('wizardGenerateError', { message: 'AI wizard creation is admin-only during testing.' });
+      return;
+    }
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
+      socket.emit('wizardGenerateError', { message: 'Please describe your wizard idea (at least 3 characters).' });
+      return;
+    }
+
+    const player = getPlayerBySocket(socket.id);
+    if (!player) return;
+
+    try {
+      socket.emit('wizardGenerateStatus', { message: '🧙 AI is crafting your wizard...' });
+      const result = await generateWizard(prompt.trim());
+
+      if (result.error) {
+        socket.emit('wizardGenerateError', { message: result.error });
+        return;
+      }
+
+      // Store the custom wizard class + spells
+      gameState.customWizards.set(result.classId, {
+        classDef: result.classDef,
+        spellDefs: result.spellDefs,
+        createdBy: player.name,
+        createdAt: Date.now(),
+      });
+
+      // Cap stored wizards to 20
+      if (gameState.customWizards.size > 20) {
+        const oldest = [...gameState.customWizards.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+        if (oldest) gameState.customWizards.delete(oldest[0]);
+      }
+
+      console.log(`🧙 Custom wizard created: "${result.classDef.name}" by ${player.name}`);
+
+      // Send back the generated wizard info to the client
+      socket.emit('wizardGenerated', {
+        classId: result.classId,
+        classDef: result.classDef,
+        spellDefs: result.spellDefs,
+      });
+    } catch (err) {
+      console.error('Wizard generation error:', err);
+      socket.emit('wizardGenerateError', { message: 'Failed to generate wizard. Please try again.' });
+    }
+  });
+
+  // Select a custom AI wizard class for current character
+  socket.on('selectCustomWizard', ({ classId }) => {
+    if (!isAdminSocket(socket.id)) return;
+    
+    const player = getPlayerBySocket(socket.id);
+    if (!player) return;
+
+    const wizard = gameState.customWizards.get(classId);
+    if (!wizard) {
+      socket.emit('wizardGenerateError', { message: 'Custom wizard not found.' });
+      return;
+    }
+
+    // Apply the custom class to the player
+    const cls = wizard.classDef;
+    player.class = classId;
+    player.className = cls.name;
+    player.color = cls.color;
+    player.secondaryColor = cls.secondaryColor || cls.color;
+    player.maxHealth = cls.baseHealth;
+    player.health = cls.baseHealth;
+    player.baseSpeed = cls.baseSpeed;
+    player.spells = cls.spells;
+    player.dashAbility = cls.dashAbility;
+    player.ultimateAbility = cls.ultimateAbility;
+    player.isCustomWizard = true;
+    player.customClassId = classId;
+
+    // Register the custom spells in the global SPELLS lookup so combat works
+    for (const [spellId, spellDef] of Object.entries(wizard.spellDefs)) {
+      SPELLS[spellId] = spellDef;
+    }
+
+    console.log(`🧙 ${player.name} switched to custom wizard: ${cls.name}`);
+    socket.emit('wizardApplied', { classId, className: cls.name });
+    
+    io.emit('chat', {
+      type: 'system',
+      text: `🧙 ${player.name} transformed into a ${cls.name}!`,
+    });
   });
 
   // List available custom dungeons
