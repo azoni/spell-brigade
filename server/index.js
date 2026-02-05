@@ -6374,6 +6374,7 @@ io.on('connection', (socket) => {
         createdBy: creatorName,
         createdAt: Date.now(),
       });
+      console.log(`🧙 Custom wizard stored: classId=${result.classId}, total stored: ${gameState.customWizards.size}`);
 
       // Cap stored wizards to 20
       if (gameState.customWizards.size > 20) {
@@ -6397,12 +6398,17 @@ io.on('connection', (socket) => {
 
   // Select a custom AI wizard class for current character
   socket.on('selectCustomWizard', async ({ classId, sessionToken }) => {
+    console.log(`🧙 selectCustomWizard received: classId=${classId}, socketId=${socket.id}`);
     const player = getPlayerBySocket(socket.id);
-    if (!player) return;
+    if (!player) {
+      console.log('🧙 selectCustomWizard failed: player not found');
+      return;
+    }
 
     const wizard = gameState.customWizards.get(classId);
     if (!wizard) {
-      socket.emit('wizardGenerateError', { message: 'Custom wizard not found.' });
+      console.log(`🧙 selectCustomWizard failed: wizard not found. Available: ${[...gameState.customWizards.keys()].join(', ')}`);
+      socket.emit('wizardGenerateError', { message: 'Custom wizard not found. It may have expired.' });
       return;
     }
 
