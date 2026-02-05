@@ -60,8 +60,8 @@ function pointInPolygon(x, y, polygon) {
 
 // Zones with polygon boundaries - Updated for larger world (7000x6000)
 const SANCTUARY_CENTER = { x: 3500, y: 3000 };
-const SANCTUARY_RADIUS = 400;
-const SANCTUARY_BUFFER = 150; // Enemies won't get closer than this to sanctuary
+const SANCTUARY_RADIUS = 600;
+const SANCTUARY_BUFFER = 200; // Enemies won't get closer than this to sanctuary
 
 const ZONES = {
   sanctuary: {
@@ -77,12 +77,12 @@ const ZONES = {
     y: SANCTUARY_CENTER.y,
     radius: SANCTUARY_RADIUS,
     polygon: [
-      { x: 3500, y: 2550 },
-      { x: 3850, y: 2775 },
-      { x: 3850, y: 3225 },
-      { x: 3500, y: 3450 },
-      { x: 3150, y: 3225 },
-      { x: 3150, y: 2775 },
+      { x: 3500, y: 2325 },
+      { x: 4025, y: 2663 },
+      { x: 4025, y: 3338 },
+      { x: 3500, y: 3675 },
+      { x: 2975, y: 3338 },
+      { x: 2975, y: 2663 },
     ],
   },
   dungeon: {
@@ -209,7 +209,7 @@ const PORTALS = {
     id: 'portal_meadow',
     name: 'Meadow Portal',
     icon: '🌸',
-    from: { x: 3500, y: 2650 },  // North position in sanctuary
+    from: { x: 3500, y: 2425 },  // North position in sanctuary
     to: { x: 3500, y: 2100 },    // Just outside sanctuary in meadow
     fromZone: 'sanctuary',
     toZone: 'meadow',
@@ -221,7 +221,7 @@ const PORTALS = {
     id: 'portal_forest',
     name: 'Forest Portal',
     icon: '🌲',
-    from: { x: 3200, y: 2850 },  // Northwest position
+    from: { x: 3050, y: 2750 },  // Northwest position
     to: { x: 1400, y: 1400 },    // Center of forest
     fromZone: 'sanctuary',
     toZone: 'forest',
@@ -233,7 +233,7 @@ const PORTALS = {
     id: 'portal_volcanic',
     name: 'Volcanic Portal',
     icon: '🔥',
-    from: { x: 3800, y: 2850 },  // Northeast position
+    from: { x: 3950, y: 2750 },  // Northeast position
     to: { x: 5800, y: 1400 },    // Center of volcanic
     fromZone: 'sanctuary',
     toZone: 'volcanic',
@@ -245,7 +245,7 @@ const PORTALS = {
     id: 'portal_frozen',
     name: 'Frozen Portal',
     icon: '❄️',
-    from: { x: 3500, y: 3350 },  // South position
+    from: { x: 3500, y: 3575 },  // South position
     to: { x: 3500, y: 4800 },    // Center of frozen
     fromZone: 'sanctuary',
     toZone: 'frozen',
@@ -257,7 +257,7 @@ const PORTALS = {
     id: 'portal_crystal',
     name: 'Crystal Portal',
     icon: '💎',
-    from: { x: 3800, y: 3150 },  // Southeast position
+    from: { x: 3950, y: 3250 },  // Southeast position
     to: { x: 6300, y: 3800 },    // Center of crystal caves
     fromZone: 'sanctuary',
     toZone: 'crystal_caves',
@@ -269,7 +269,7 @@ const PORTALS = {
     id: 'portal_abyss',
     name: 'Abyss Portal',
     icon: '🌀',
-    from: { x: 3200, y: 3150 },  // Southwest position
+    from: { x: 3050, y: 3250 },  // Southwest position
     to: { x: 500, y: 700 },      // Center of abyss
     fromZone: 'sanctuary',
     toZone: 'abyss',
@@ -290,6 +290,7 @@ const BUILDINGS = {
     color: '#ffd93d',
     interactable: true,
     services: ['respawn', 'heal'],
+    upgradeType: null, // Hint only - no upgrades
   },
   forest_ruins: {
     id: 'forest_ruins',
@@ -299,6 +300,7 @@ const BUILDINGS = {
     zone: 'forest',
     color: '#78716c',
     interactable: true,
+    upgradeType: 'health',
   },
   volcano_fortress: {
     id: 'volcano_fortress',
@@ -308,6 +310,7 @@ const BUILDINGS = {
     zone: 'volcanic',
     color: '#7f1d1d',
     interactable: true,
+    upgradeType: 'damage',
   },
   ice_citadel: {
     id: 'ice_citadel',
@@ -317,6 +320,7 @@ const BUILDINGS = {
     zone: 'frozen',
     color: '#0284c7',
     interactable: true,
+    upgradeType: 'cooldown',
   },
   void_shrine: {
     id: 'void_shrine',
@@ -326,6 +330,7 @@ const BUILDINGS = {
     zone: 'abyss',
     color: '#7c3aed',
     interactable: true,
+    upgradeType: 'speed',
   },
   crystal_sanctum: {
     id: 'crystal_sanctum',
@@ -335,6 +340,7 @@ const BUILDINGS = {
     zone: 'crystal_caves',
     color: '#ec4899',
     interactable: true,
+    upgradeType: 'attackSpeed',
   },
   // Healing Fountain in sanctuary center
   healing_fountain: {
@@ -359,7 +365,7 @@ const NPCS = {
     id: 'ethereal_guide',
     name: 'Ethereal Guide',
     type: 'guide',
-    x: 3400, y: 2700,
+    x: 3350, y: 2600,
     radius: 20,
     zone: 'sanctuary',
     color: '#67e8f9',
@@ -379,7 +385,7 @@ const NPCS = {
     id: 'quest_master',
     name: 'Quest Master Seraphina',
     type: 'quest_master',
-    x: 3350, y: 2850,
+    x: 3200, y: 2900,
     radius: 18,
     zone: 'sanctuary',
     color: '#ffd93d',
@@ -414,7 +420,7 @@ const NPCS = {
     id: 'knight_commander',
     name: 'Knight Commander Aldric',
     type: 'knight',
-    x: 3650, y: 3100,
+    x: 3750, y: 3200,
     radius: 18,
     zone: 'sanctuary',
     color: '#a8a29e',
@@ -441,7 +447,7 @@ const NPCS = {
     id: 'shapeshifter',
     name: 'Mirage the Shapeshifter',
     type: 'shapeshifter',
-    x: 3250, y: 2950,
+    x: 3150, y: 3100,
     radius: 20,
     zone: 'sanctuary',
     color: '#ec4899',
@@ -472,7 +478,7 @@ const NPCS = {
     id: 'dungeon_architect',
     name: 'Arcanus the Dreamweaver',
     type: 'dungeon_architect',
-    x: 3700, y: 2850,
+    x: 3800, y: 2900,
     radius: 20,
     zone: 'sanctuary',
     color: '#8b5cf6',
@@ -516,9 +522,13 @@ const SKINS = {
   arcanist_celestial: { id: 'arcanist_celestial', class: 'arcanist', name: 'Celestial', color: '#fcd34d', requiredXp: 5000, special: true },
   arcanist_cosmic: { id: 'arcanist_cosmic', class: 'arcanist', name: 'Cosmic Entity', color: '#1e1b4b', requiredXp: 10000, special: true },
   
-  // Voidlord skins (Admin)
+  // Voidlord skins (unlocked after dragon kill)
   voidlord_default: { id: 'voidlord_default', class: 'voidlord', name: 'Void Lord', color: '#1a0a2e', requiredXp: 0 },
-  voidlord_ascended: { id: 'voidlord_ascended', class: 'voidlord', name: 'Ascended', color: '#ff00ff', requiredXp: 0 },
+  voidlord_ascended: { id: 'voidlord_ascended', class: 'voidlord', name: 'Ascended', color: '#ff00ff', requiredXp: 5000 },
+  
+  // Shadow Archer skins (Admin)
+  shadowarcher_default: { id: 'shadowarcher_default', class: 'shadowarcher', name: 'Shadow Archer', color: '#334155', requiredXp: 0 },
+  shadowarcher_crimson: { id: 'shadowarcher_crimson', class: 'shadowarcher', name: 'Crimson Hunter', color: '#991b1b', requiredXp: 0 },
 };
 
 // XP thresholds for titles/ranks
@@ -612,21 +622,55 @@ const CLASSES = {
     },
   },
   
-  // === ADMIN CLASS - Secret ===
+  // === UNLOCKABLE CLASS - After Dragon Kill ===
   voidlord: {
     id: 'voidlord',
     name: 'Void Lord',
     color: '#1a0a2e',
     secondaryColor: '#ff00ff',
-    baseHealth: 200,
-    baseSpeed: 280, // Significantly faster than other classes
+    baseHealth: 95,
+    baseSpeed: 155,
     spells: ['voidBolt', 'annihilate'],
-    description: 'Master of the void. Unmatched power.',
-    isAdmin: true,
-    canPvP: true, // Can damage other players
+    description: 'Master of the void. Unlocked by slaying the Dragon.',
+    hidden: true, // Hidden until dragon is killed
+    requiresDragonKill: true,
     dashAbility: {
       id: 'voidShift',
       name: 'Void Shift',
+      cooldown: 5000,
+      distance: 200,
+      invulnerable: true,
+      damageOnArrival: 25,
+      damageRadius: 60,
+    },
+    ultimateAbility: {
+      id: 'voidRift',
+      name: 'Void Rift',
+      cooldown: 22000,
+      damage: 80,
+      radius: 200,
+      pullForce: 100,
+      duration: 2500,
+    },
+  },
+  
+  // === ADMIN CLASS - Shadow Archer ===
+  shadowarcher: {
+    id: 'shadowarcher',
+    name: 'Shadow Archer',
+    color: '#334155',
+    secondaryColor: '#dc2626',
+    baseHealth: 200,
+    baseSpeed: 280,
+    spells: ['shadowArrow', 'piercingVolley'],
+    description: 'Elite shadow hunter. Admin exclusive.',
+    isAdmin: true,
+    hidden: true,
+    canPvP: true,
+    icon: '🏹',
+    dashAbility: {
+      id: 'shadowStep',
+      name: 'Shadow Step',
       cooldown: 2000,
       distance: 350,
       invulnerable: true,
@@ -634,13 +678,13 @@ const CLASSES = {
       damageRadius: 80,
     },
     ultimateAbility: {
-      id: 'voidRift',
-      name: 'Void Rift',
+      id: 'arrowStorm',
+      name: 'Arrow Storm',
       cooldown: 10000,
-      damage: 200,
-      radius: 300,
-      pullForce: 150, // Pulls enemies toward center
-      duration: 3000,
+      damage: 150,
+      radius: 350,
+      duration: 2000,
+      waves: 5,
     },
   },
 };
@@ -725,26 +769,52 @@ const SPELLS = {
   voidBolt: {
     id: 'voidBolt',
     name: 'Void Bolt',
-    damage: 60,
-    cooldown: 300,
-    range: 500,
-    speed: 800,
-    radius: 18,
+    damage: 30,
+    cooldown: 700,
+    range: 350,
+    speed: 500,
+    radius: 12,
     color: '#1a0a2e',
     trailColor: '#ff00ff',
-    piercing: true, // Goes through enemies
-    canHitPlayers: true, // PvP enabled
-    isVoidBolt: true, // Special rendering flag
+    piercing: true,
+    isVoidBolt: true,
   },
   annihilate: {
     id: 'annihilate',
     name: 'Annihilate',
-    damage: 100,
-    cooldown: 1500,
-    range: 400,
+    damage: 45,
+    cooldown: 2500,
+    range: 300,
     speed: 0, // AOE
-    radius: 200,
+    radius: 120,
     color: '#ff00ff',
+    isAoe: true,
+  },
+  
+  // === SHADOW ARCHER SPELLS ===
+  shadowArrow: {
+    id: 'shadowArrow',
+    name: 'Shadow Arrow',
+    damage: 55,
+    cooldown: 350,
+    range: 550,
+    speed: 900,
+    radius: 8,
+    color: '#0f172a',
+    trailColor: '#dc2626',
+    piercing: true,
+    canHitPlayers: true,
+    isArrow: true,
+  },
+  piercingVolley: {
+    id: 'piercingVolley',
+    name: 'Piercing Volley',
+    damage: 80,
+    cooldown: 1500,
+    range: 450,
+    speed: 0,
+    radius: 180,
+    color: '#dc2626',
     isAoe: true,
     canHitPlayers: true,
   },
@@ -957,14 +1027,14 @@ const SPELLS = {
   voidRiftAbility: {
     id: 'voidRiftAbility',
     name: 'Void Rift',
-    damage: 50,
-    cooldown: 8000,
-    range: 300,
+    damage: 30,
+    cooldown: 10000,
+    range: 250,
     speed: 0,
-    radius: 120,
+    radius: 100,
     color: '#8b00ff',
     isAoe: true,
-    duration: 4000,
+    duration: 3000,
     class: 'voidlord',
     levelRequired: 10,
     hotkey: 1,
@@ -973,15 +1043,15 @@ const SPELLS = {
   soulDrain: {
     id: 'soulDrain',
     name: 'Soul Drain',
-    damage: 80,
-    cooldown: 12000,
-    range: 400,
+    damage: 40,
+    cooldown: 14000,
+    range: 350,
     speed: 400,
-    radius: 15,
+    radius: 12,
     color: '#ff00ff',
     trailColor: '#8b008b',
     homing: true,
-    lifesteal: 0.5,
+    lifesteal: 0.3,
     class: 'voidlord',
     levelRequired: 20,
     hotkey: 2,
@@ -990,17 +1060,71 @@ const SPELLS = {
   apocalypse: {
     id: 'apocalypse',
     name: 'Apocalypse',
-    damage: 500,
-    cooldown: 60000,
+    damage: 120,
+    cooldown: 45000,
     range: 0,
     speed: 0,
-    radius: 500,
+    radius: 250,
     color: '#1a0a2e',
     isAoe: true,
     class: 'voidlord',
     levelRequired: 30,
     hotkey: 3,
     description: 'Unleash the void to annihilate everything nearby',
+  },
+  
+  // === SHADOW ARCHER CLASS ABILITIES ===
+  huntersMark: {
+    id: 'huntersMark',
+    name: "Hunter's Mark",
+    damage: 30,
+    cooldown: 6000,
+    range: 500,
+    speed: 1200,
+    radius: 8,
+    color: '#dc2626',
+    trailColor: '#991b1b',
+    isArrow: true,
+    piercing: true,
+    canHitPlayers: true,
+    class: 'shadowarcher',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Mark a target - next attacks deal bonus damage',
+  },
+  multishot: {
+    id: 'multishot',
+    name: 'Multishot',
+    damage: 40,
+    cooldown: 10000,
+    range: 0,
+    speed: 0,
+    radius: 250,
+    color: '#dc2626',
+    isAoe: true,
+    canHitPlayers: true,
+    class: 'shadowarcher',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Fire arrows in all directions',
+  },
+  deathArrow: {
+    id: 'deathArrow',
+    name: 'Death Arrow',
+    damage: 300,
+    cooldown: 30000,
+    range: 700,
+    speed: 1500,
+    radius: 12,
+    color: '#000',
+    trailColor: '#dc2626',
+    isArrow: true,
+    piercing: true,
+    canHitPlayers: true,
+    class: 'shadowarcher',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'A devastating arrow that obliterates its target',
   },
 };
 
@@ -1369,7 +1493,7 @@ async function savePlayerToDb(player) {
     bossKills: player.bossKills || {},
     questComplete: player.questComplete || false,
     spellUpgrades: player.spellUpgrades || [],
-    upgrades: player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 },
+    upgrades: player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
     createdAt: player.createdAt || new Date().toISOString(),
     lastSeen: new Date().toISOString(),
   };
@@ -1925,6 +2049,51 @@ app.post('/auth/link-character', async (req, res) => {
   res.json({ success: true, characters: user.characters });
 });
 
+// Delete character from account
+app.post('/auth/delete-character', async (req, res) => {
+  const { sessionToken, characterId } = req.body;
+  
+  if (!sessionToken || !sessionsDb[sessionToken]) {
+    return res.status(401).json({ error: 'Invalid session' });
+  }
+  
+  const session = sessionsDb[sessionToken];
+  if (session.isGuest) {
+    return res.status(400).json({ error: 'Guests cannot delete characters' });
+  }
+  
+  const user = await loadUserFromDb(session.userId);
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+  
+  // Remove from user's character list
+  user.characters = (user.characters || []).filter(id => id !== characterId);
+  await saveUserToDb(user);
+  
+  // Remove from player DB cache
+  delete playersDb[characterId];
+  
+  // Remove from Firebase if enabled
+  if (db) {
+    try {
+      await db.collection('spellBrigade').doc(characterId).delete();
+    } catch (err) {
+      console.error('Firebase delete error:', err.message);
+    }
+  }
+  
+  // Load remaining characters for response
+  const characters = [];
+  for (const charId of user.characters || []) {
+    const char = await loadPlayerFromDb(charId);
+    if (char) characters.push(char);
+  }
+  
+  console.log(`🗑️ User ${user.username} deleted character ${characterId}`);
+  res.json({ success: true, characters });
+});
+
 // Logout endpoint
 app.post('/auth/logout', (req, res) => {
   const { sessionToken } = req.body;
@@ -2285,6 +2454,7 @@ function onBossDeath(enemy, killer) {
         socket.emit('dragonSlayerReward', {
           xp: dragonRewardXp,
           title: 'Dragonslayer',
+          voidlordUnlocked: true,
         });
       }
       
@@ -2865,7 +3035,8 @@ function gameTick() {
       // Use player's stored baseSpeed (includes level bonus) and apply speedMultiplier from upgrades
       const baseSpeed = player.baseSpeed || CLASSES[player.class]?.baseSpeed || 150;
       const speedMult = player.speedMultiplier || 1;
-      const speed = baseSpeed * speedMult;
+      const SPEED_CAP = 350; // Max effective speed
+      const speed = Math.min(baseSpeed * speedMult, player.isAdmin ? 999 : SPEED_CAP);
       
       player.x += move.x * speed * dt;
       player.y += move.y * speed * dt;
@@ -3067,7 +3238,7 @@ function gameTick() {
           if (!spell) continue;
 
           const lastCast = player.lastCast?.[spellId] || 0;
-          const effectiveCooldown = spell.cooldown * (player.cooldownMultiplier || 1);
+          const effectiveCooldown = spell.cooldown * (player.cooldownMultiplier || 1) * (player.attackSpeedMultiplier || 1);
           if (now - lastCast >= effectiveCooldown) {
             // Find target
             let target = null;
@@ -4350,6 +4521,7 @@ function gameTick() {
         damageMultiplier: p.damageMultiplier || 1,
         speedMultiplier: p.speedMultiplier || 1,
         cooldownMultiplier: p.cooldownMultiplier || 1,
+        attackSpeedMultiplier: p.attackSpeedMultiplier || 1,
         isAdmin: p.isAdmin || false,
       })),
       enemies: nearbyEnemies,
@@ -4444,7 +4616,7 @@ io.on('connection', (socket) => {
   // Send available classes
   socket.emit('classes', CLASSES);
 
-  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey }) => {
+  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey, sessionToken }) => {
     // Prevent double-join from same socket
     for (const p of gameState.players.values()) {
       if (p.socketId === socket.id) {
@@ -4453,28 +4625,84 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Check if azoni account - auto-grant admin
-    const isAzoniAccount = playerName?.toLowerCase() === 'azoni';
+    // Check if azoni account via session token (server-side verification only)
+    let isAzoniAccount = false;
+    if (sessionToken && sessionsDb[sessionToken]) {
+      const session = sessionsDb[sessionToken];
+      if (!session.isGuest && session.userId) {
+        const user = await loadUserFromDb(session.userId);
+        if (user?.username?.toLowerCase() === 'azoni') {
+          isAzoniAccount = true;
+        }
+      }
+    }
     
-    // Validate class - voidlord is available to all players
+    // Validate class selection
     let validatedClass = playerClass;
-    let isAdmin = false;
-    if (playerClass === 'voidlord') {
-      const correctKey = process.env.ADMIN_KEY || 'azoni-voidlord-2026';
-      if (adminKey === correctKey || isAzoniAccount) {
-        isAdmin = true;
-        console.log(`Admin ${playerName} authenticated as Void Lord`);
-      } else {
-        console.log(`${playerName} selected Void Lord`);
+    let isAdmin = isAzoniAccount;
+    
+    // Load or create player - ONLY by unique ID, never by name
+    let saved = playerId ? await loadPlayerFromDb(playerId) : null;
+    
+    // OWNERSHIP CHECK: If loading existing character, verify it belongs to this user
+    if (saved && playerId) {
+      let ownsCharacter = false;
+      if (sessionToken && sessionsDb[sessionToken]) {
+        const sess = sessionsDb[sessionToken];
+        if (!sess.isGuest && sess.userId) {
+          const usr = await loadUserFromDb(sess.userId);
+          if (usr?.characters?.includes(playerId)) {
+            ownsCharacter = true;
+          }
+        } else if (sess.isGuest && sess.guestId) {
+          // Guest can only load their own guest character
+          ownsCharacter = (saved.guestId === sess.guestId);
+        }
+      }
+      if (!ownsCharacter) {
+        console.log(`⛔ Ownership check failed: ${playerName} tried to load character ${playerId}`);
+        saved = null; // Force new character creation
+      }
+    }
+    
+    // For EXISTING characters, always use saved class (skip validation)
+    // Class validation only applies to NEW character creation
+    if (saved) {
+      validatedClass = saved.class;
+    } else {
+      // Shadow Archer requires admin (new character only)
+      if (playerClass === 'shadowarcher') {
+        if (!isAdmin) {
+          validatedClass = 'pyromancer';
+          console.log(`${playerName} tried to pick Shadow Archer without admin`);
+        } else {
+          console.log(`Admin ${playerName} playing as Shadow Archer`);
+        }
+      }
+      
+      // Voidlord requires dragon kill (new character only)
+      if (playerClass === 'voidlord') {
+        let hasDragonKill = false;
+        // Check user's other characters for dragon kill
+        if (sessionToken && sessionsDb[sessionToken]) {
+          const sess = sessionsDb[sessionToken];
+          if (!sess.isGuest && sess.userId) {
+            const usr = await loadUserFromDb(sess.userId);
+            if (usr?.characters) {
+              for (const cid of usr.characters) {
+                const c = await loadPlayerFromDb(cid);
+                if (c?.bossKills?.dragon) { hasDragonKill = true; break; }
+              }
+            }
+          }
+        }
+        if (!hasDragonKill && !isAdmin) {
+          validatedClass = 'pyromancer';
+          console.log(`${playerName} tried to pick Void Lord without dragon kill`);
+        }
       }
     }
     const classData = CLASSES[validatedClass] || CLASSES.pyromancer;
-    
-    // Load or create player
-    let saved = playerId ? await loadPlayerFromDb(playerId) : null;
-    if (!saved && playerName) {
-      saved = loadPlayerByName(playerName);
-    }
 
     const id = saved?.id || uuidv4();
     const totalXp = saved?.totalXp || 0;
@@ -4512,7 +4740,7 @@ io.on('connection', (socket) => {
       alternateSpells: saved?.alternateSpells || {}, // { slot: spellId }
       bossKills: saved?.bossKills || {}, // Track defeated zone bosses
       questComplete: saved?.questComplete || false,
-      upgrades: saved?.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 },
+      upgrades: saved?.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
       x: 3000, // Sanctuary center
       y: 2500,
       health: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5,
@@ -4521,6 +4749,7 @@ io.on('connection', (socket) => {
       damageMultiplier: damageMultiplier * Math.pow(1.01, saved?.upgrades?.damage || 0),
       speedMultiplier: Math.pow(1.01, saved?.upgrades?.speed || 0),
       cooldownMultiplier: Math.pow(0.99, saved?.upgrades?.cooldown || 0),
+      attackSpeedMultiplier: Math.pow(0.98, saved?.upgrades?.attackSpeed || 0), // 2% faster auto-attack per level
       input: { up: false, down: false, left: false, right: false },
       lastCast: {},
       castCount: {}, // Track cast count for "every Nth" effects
@@ -4530,10 +4759,18 @@ io.on('connection', (socket) => {
       animTime: 0,
       createdAt: saved?.createdAt || new Date().toISOString(),
       lastLogin: new Date().toISOString(),
-      isAdmin: isAdmin || isAzoniAccount,
+      isAdmin: isAdmin,
     };
+    
+    // Store guestId on player for ownership tracking
+    if (sessionToken && sessionsDb[sessionToken]?.isGuest) {
+      player.guestId = sessionsDb[sessionToken].guestId;
+    }
 
     gameState.players.set(id, player);
+    
+    // Save to DB immediately so character persists even before disconnect
+    savePlayerToDb(player);
 
     // Get rank
     const rank = RANKS.reduce((best, r) => totalXp >= r.xp ? r : best, RANKS[0]);
@@ -4558,7 +4795,8 @@ io.on('connection', (socket) => {
         damageMultiplier: player.damageMultiplier,
         speedMultiplier: player.speedMultiplier || 1,
         cooldownMultiplier: player.cooldownMultiplier || 1,
-        upgrades: player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 },
+        attackSpeedMultiplier: player.attackSpeedMultiplier || 1,
+        upgrades: player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
         isAdmin: player.isAdmin || false,
         bossKills: player.bossKills,
         questComplete: player.questComplete,
@@ -4728,6 +4966,22 @@ io.on('connection', (socket) => {
           player.invulnerableUntil = now + 300; // Brief invulnerability
           spawnParticles(startX, startY, '#9b5de5', 8);
           spawnParticles(player.x, player.y, '#9b5de5', 8);
+        } else if ((dash.id === 'voidShift' || dash.id === 'shadowStep') && dash.damageOnArrival) {
+          // Damage on arrival + invulnerability
+          if (dash.invulnerable) player.invulnerableUntil = now + 300;
+          const dashColor = dash.id === 'shadowStep' ? '#dc2626' : '#ff00ff';
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < dash.damageRadius) {
+              enemy.health -= dash.damageOnArrival;
+              spawnDamageNumber(enemy.x, enemy.y - 20, dash.damageOnArrival);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          spawnParticles(startX, startY, dashColor, 10);
+          spawnParticles(player.x, player.y, dashColor, 10);
+          io.emit('explosion', { x: player.x, y: player.y, radius: dash.damageRadius, color: dashColor });
         }
         
         io.emit('sound', { type: 'dash', x: player.x, y: player.y, classId: player.class });
@@ -4916,6 +5170,59 @@ io.on('connection', (socket) => {
           }, 100);
           
           io.emit('sound', { type: 'voidRift', x: riftX, y: riftY });
+        } else if (ult.id === 'arrowStorm') {
+          // Arrow Storm - waves of arrows raining down in a large area
+          const stormX = tx ?? player.x;
+          const stormY = ty ?? player.y;
+          
+          io.emit('arrowStorm', { 
+            x: stormX, y: stormY, 
+            radius: ult.radius, 
+            duration: ult.duration,
+            playerId: player.id,
+          });
+          
+          let wave = 0;
+          const waveInterval = setInterval(() => {
+            if (wave >= ult.waves) {
+              clearInterval(waveInterval);
+              io.emit('explosion', { x: stormX, y: stormY, radius: ult.radius * 0.3, color: '#dc2626' });
+              return;
+            }
+            
+            const dmgPerWave = ult.damage / ult.waves;
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+              if (distance(enemy, { x: stormX, y: stormY }) < ult.radius) {
+                enemy.health -= dmgPerWave;
+                spawnDamageNumber(enemy.x, enemy.y - 20, Math.round(dmgPerWave));
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+            
+            // PvP damage
+            if (player.pvpEnabled === true) {
+              for (const otherPlayer of gameState.players.values()) {
+                if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
+                if (distance(otherPlayer, { x: stormX, y: stormY }) < ult.radius) {
+                  const pvpDmg = dmgPerWave * 0.6;
+                  otherPlayer.health -= pvpDmg;
+                  spawnDamageNumber(otherPlayer.x, otherPlayer.y - 20, Math.round(pvpDmg));
+                  const otherSocket = io.sockets.sockets.get(otherPlayer.socketId);
+                  if (otherSocket) otherSocket.emit('damaged', { amount: pvpDmg });
+                  if (otherPlayer.health <= 0) {
+                    otherPlayer.deaths = (otherPlayer.deaths || 0) + 1;
+                    if (otherSocket) otherSocket.emit('died', { killedBy: 'Shadow Archer', deathMessage: 'Pierced by the storm!' });
+                  }
+                }
+              }
+            }
+            
+            wave++;
+          }, ult.duration / ult.waves);
+          
+          io.emit('sound', { type: 'arrowStorm', x: stormX, y: stormY });
         }
         
         socket.emit('ultimateUsed', { cooldown: ult.cooldown });
@@ -5015,14 +5322,30 @@ io.on('connection', (socket) => {
   });
 
   // Buy upgrade from shop
-  socket.on('buyUpgrade', ({ type }) => {
+  socket.on('buyUpgrade', ({ type, buildingId }) => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
+        // Building-to-upgrade mapping
+        const buildingUpgradeMap = {
+          forest_ruins: 'health',
+          volcano_fortress: 'damage',
+          ice_citadel: 'cooldown',
+          void_shrine: 'speed',
+          crystal_sanctum: 'attackSpeed',
+        };
+        
+        // Verify the upgrade type matches the building
+        if (buildingId && buildingUpgradeMap[buildingId] && buildingUpgradeMap[buildingId] !== type) {
+          socket.emit('shopError', { message: 'This building does not offer that upgrade' });
+          return;
+        }
+        
         const costs = {
           health: 500,
           damage: 750,
           speed: 600,
           cooldown: 1000,
+          attackSpeed: 800,
         };
         
         const cost = costs[type];
@@ -5040,7 +5363,7 @@ io.on('connection', (socket) => {
         player.totalXp -= cost;
         
         // Initialize upgrades if not exist
-        player.upgrades = player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 };
+        player.upgrades = player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 };
         
         // Apply upgrade
         if (type === 'health') {
@@ -5056,6 +5379,9 @@ io.on('connection', (socket) => {
         } else if (type === 'cooldown') {
           player.upgrades.cooldown += 1;
           player.cooldownMultiplier = (player.cooldownMultiplier || 1) * 0.99;
+        } else if (type === 'attackSpeed') {
+          player.upgrades.attackSpeed += 1;
+          player.attackSpeedMultiplier = (player.attackSpeedMultiplier || 1) * 0.98;
         }
         
         socket.emit('upgradePurchased', { 
@@ -5065,6 +5391,7 @@ io.on('connection', (socket) => {
           damageMultiplier: player.damageMultiplier || 1,
           speedMultiplier: player.speedMultiplier || 1,
           cooldownMultiplier: player.cooldownMultiplier || 1,
+          attackSpeedMultiplier: player.attackSpeedMultiplier || 1,
           maxHealth: player.maxHealth,
           health: player.health,
         });
@@ -5111,8 +5438,8 @@ io.on('connection', (socket) => {
   socket.on('togglePvP', () => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
-        // Only voidlord can toggle PvP
-        if (player.class === 'voidlord') {
+        // PvP classes can toggle PvP
+        if (player.class === 'voidlord' || player.class === 'shadowarcher') {
           player.pvpEnabled = player.pvpEnabled === true ? false : true;
           socket.emit('pvpToggled', { enabled: player.pvpEnabled === true });
           console.log(`👹 ${player.name} PvP: ${player.pvpEnabled ? 'ON' : 'OFF'}`);
@@ -5126,8 +5453,8 @@ io.on('connection', (socket) => {
   socket.on('toggleInvincible', () => {
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
-        // Only admin voidlord can toggle invincibility
-        if (player.class === 'voidlord' && player.isAdmin) {
+        // Only admin can toggle invincibility
+        if (player.isAdmin) {
           player.invincible = !player.invincible;
           socket.emit('invincibleToggled', { enabled: player.invincible });
           console.log(`✨ ${player.name} Invincibility: ${player.invincible ? 'ON' : 'OFF'}`);
@@ -5153,6 +5480,7 @@ io.on('connection', (socket) => {
         arcanist: { 1: 'blink', 2: 'arcaneBarrage', 3: 'timeWarp' },
         stormcaller: { 1: 'staticField', 2: 'ballLightning', 3: 'thunderGod' },
         voidlord: { 1: 'voidRiftAbility', 2: 'soulDrain', 3: 'apocalypse' },
+        shadowarcher: { 1: 'huntersMark', 2: 'multishot', 3: 'deathArrow' },
       };
       
       const levelReqs = { 1: 10, 2: 20, 3: 30 };
@@ -5527,6 +5855,78 @@ io.on('connection', (socket) => {
         io.emit('apocalypse', { x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#8b00ff', 60);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'huntersMark') {
+        // Hunter's Mark - fast piercing arrow
+        const facing = player.facing || 'right';
+        const dirs = { up: {x:0,y:-1}, down: {x:0,y:1}, left: {x:-1,y:0}, right: {x:1,y:0} };
+        const dir = dirs[facing] || dirs.right;
+        gameState.projectiles.set(uuidv4(), {
+          x: player.x, y: player.y,
+          vx: dir.x * spell.speed, vy: dir.y * spell.speed,
+          damage: spell.damage * (player.damageMultiplier || 1),
+          radius: spell.radius,
+          ownerId: player.id,
+          spellId: 'huntersMark',
+          ownerClass: player.class,
+          color: spell.color,
+          trailColor: spell.trailColor,
+          lifetime: spell.range / spell.speed * 1000,
+          createdAt: Date.now(),
+          piercing: true,
+          canHitPlayers: true,
+          isArrow: true,
+        });
+        spawnParticles(player.x, player.y, '#dc2626', 6);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'multishot') {
+        // Multishot - arrows in all directions
+        const numArrows = 12;
+        for (let i = 0; i < numArrows; i++) {
+          const angle = (i / numArrows) * Math.PI * 2;
+          const speed = 600;
+          gameState.projectiles.set(uuidv4(), {
+            x: player.x, y: player.y,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            damage: spell.damage * (player.damageMultiplier || 1),
+            radius: 6,
+            ownerId: player.id,
+            spellId: 'multishot',
+            ownerClass: player.class,
+            color: '#dc2626',
+            trailColor: '#991b1b',
+            lifetime: 800,
+            createdAt: Date.now(),
+            piercing: true,
+            canHitPlayers: true,
+            isArrow: true,
+          });
+        }
+        io.emit('multishot', { x: player.x, y: player.y });
+        spawnParticles(player.x, player.y, '#dc2626', 30);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'deathArrow') {
+        // Death Arrow - devastating single shot
+        const facing = player.facing || 'right';
+        const dirs = { up: {x:0,y:-1}, down: {x:0,y:1}, left: {x:-1,y:0}, right: {x:1,y:0} };
+        const dir = dirs[facing] || dirs.right;
+        gameState.projectiles.set(uuidv4(), {
+          x: player.x, y: player.y,
+          vx: dir.x * spell.speed, vy: dir.y * spell.speed,
+          damage: spell.damage * (player.damageMultiplier || 1),
+          radius: spell.radius,
+          ownerId: player.id,
+          spellId: 'deathArrow',
+          ownerClass: player.class,
+          color: spell.color,
+          trailColor: spell.trailColor,
+          lifetime: spell.range / spell.speed * 1000,
+          createdAt: Date.now(),
+          piercing: true,
+          canHitPlayers: true,
+          isArrow: true,
+        });
+        spawnParticles(player.x, player.y, '#000', 10);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
       }
       
       break;
@@ -5831,10 +6231,27 @@ io.on('connection', (socket) => {
   });
 
   // Get player data (for character select)
-  socket.on('getPlayerData', async ({ playerId, playerName }) => {
+  socket.on('getPlayerData', async ({ playerId, playerName, sessionToken }) => {
     let saved = playerId ? await loadPlayerFromDb(playerId) : null;
-    if (!saved && playerName) {
-      saved = loadPlayerByName(playerName);
+    
+    // OWNERSHIP CHECK: Only return character data if caller owns it
+    if (saved && playerId) {
+      let ownsCharacter = false;
+      if (sessionToken && sessionsDb[sessionToken]) {
+        const sess = sessionsDb[sessionToken];
+        if (!sess.isGuest && sess.userId) {
+          const usr = await loadUserFromDb(sess.userId);
+          if (usr?.characters?.includes(playerId)) {
+            ownsCharacter = true;
+          }
+        } else if (sess.isGuest && sess.guestId) {
+          ownsCharacter = (saved.guestId === sess.guestId);
+        }
+      }
+      if (!ownsCharacter) {
+        console.log(`⛔ getPlayerData ownership check failed for ${playerId}`);
+        saved = null;
+      }
     }
     
     if (saved) {
