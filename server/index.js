@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { generateDungeon, getDungeonRoom, getDungeonBounds, getRoomEnemies, getRoomCenterY, sanitizeDungeonForClient } from './dungeon-generator.js';
 
 // ===========================================
 // CONFIG
@@ -467,6 +468,24 @@ const NPCS = {
     ],
     skinPrompt: "Would you like to change your appearance?",
   },
+  dungeon_architect: {
+    id: 'dungeon_architect',
+    name: 'Arcanus the Dreamweaver',
+    type: 'dungeon_architect',
+    x: 3700, y: 2850,
+    radius: 20,
+    zone: 'sanctuary',
+    color: '#8b5cf6',
+    interactRange: 80,
+    stationary: true,
+    emoji: '🏗️',
+    greetings: [
+      "Ah, a visitor! I am Arcanus, weaver of pocket dimensions.",
+      "I can shape the fabric of reality into any dungeon you can imagine.",
+      "Describe your nightmare, and I shall build it for you to conquer.",
+      "Want to test your skills? I have dungeons crafted by other wizards too.",
+    ],
+  },
 };
 
 // NPC State tracking
@@ -710,11 +729,12 @@ const SPELLS = {
     cooldown: 300,
     range: 500,
     speed: 800,
-    radius: 15,
+    radius: 18,
     color: '#1a0a2e',
     trailColor: '#ff00ff',
     piercing: true, // Goes through enemies
     canHitPlayers: true, // PvP enabled
+    isVoidBolt: true, // Special rendering flag
   },
   annihilate: {
     id: 'annihilate',
@@ -1349,6 +1369,7 @@ async function savePlayerToDb(player) {
     bossKills: player.bossKills || {},
     questComplete: player.questComplete || false,
     spellUpgrades: player.spellUpgrades || [],
+    upgrades: player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 },
     createdAt: player.createdAt || new Date().toISOString(),
     lastSeen: new Date().toISOString(),
   };
@@ -1491,6 +1512,7 @@ const gameState = {
   bossRespawnTimers: new Map(), // Zone -> respawn timestamp
   npcs: new Map(),         // NPCs (id -> npc state)
   dungeonInstances: new Map(), // Player dungeon instances
+  customDungeons: new Map(), // Custom AI-generated dungeons (id -> config)
   lastTick: Date.now(),
   tickCount: 0,
 };
@@ -2272,6 +2294,35 @@ function onBossDeath(enemy, killer) {
     return; // Skip normal boss respawn logic for dragon
   }
   
+  // Custom dungeon boss killed - spawn victory portal
+  if (enemy.isCustomBoss && enemy.customDungeonId) {
+    const cfgId = enemy.customDungeonId;
+    const cfg = gameState.customDungeons.get(cfgId);
+    console.log(`⚔️ Custom boss "${enemy.name}" defeated!`);
+    
+    // Victory portal
+    io.emit('dragonDefeated', { x: enemy.x, y: enemy.y, killerName: killer?.name || 'Unknown Hero' });
+    gameState.dungeonVictoryPortal = { x: enemy.x, y: enemy.y - 350, active: true, createdAt: Date.now() };
+    
+    io.emit('chat', { type: 'system', text: `🏆 ${enemy.name.toUpperCase()} HAS BEEN SLAIN BY ${(killer?.name || 'A BRAVE HERO').toUpperCase()}! 🏆` });
+    
+    if (cfg) cfg.clears = (cfg.clears || 0) + 1;
+    
+    if (killer) {
+      const rewardXp = enemy.killReward || 20000;
+      killer.xp += rewardXp;
+      killer.totalXp += rewardXp;
+      
+      const socket = io.sockets.sockets.get(killer.socketId);
+      if (socket) {
+        socket.emit('dragonSlayerReward', { xp: rewardXp, title: `Slayer of ${enemy.name}` });
+      }
+      savePlayerToDb(killer);
+    }
+    
+    return; // Skip normal boss respawn logic
+  }
+  
   if (zoneId && ZONE_BOSS_TYPES[zoneId]) {
     gameState.zoneBosses.delete(zoneId);
     gameState.bossRespawnTimers.set(zoneId, Date.now() + BOSS_RESPAWN_TIME);
@@ -2632,6 +2683,51 @@ function spawnDragonBoss() {
   console.log('🐉 Dragon boss spawned!');
 }
 
+// Spawn a custom dungeon boss based on config
+function spawnCustomBoss(config, player) {
+  const b = config.boss;
+  const center = config.layout.bossCenter;
+  
+  // Check if a custom boss already exists for this dungeon
+  for (const enemy of gameState.enemies.values()) {
+    if (enemy.isCustomBoss && enemy.customDungeonId === config.id) return;
+  }
+  
+  const boss = {
+    id: uuidv4(),
+    type: 'custom_boss',
+    name: b.name,
+    health: b.health,
+    maxHealth: b.health,
+    baseSpeed: b.speed,
+    damage: b.damage,
+    radius: b.radius,
+    xp: b.xp || 15000,
+    color: b.color,
+    behavior: 'boss_dragon', // Reuse dragon AI - it's the most complex
+    isBoss: true,
+    isCustomBoss: true,
+    isDungeon: true,
+    customDungeonId: config.id,
+    x: center.x,
+    y: center.y,
+    zone: 'dungeon',
+    facing: 'up',
+    animFrame: 0,
+    slowedUntil: 0,
+    frozenUntil: 0,
+    lastAbility: 0,
+    phase: 1,
+    attackPattern: 0,
+    attackRange: b.attackRange || 600,
+    attackCooldown: b.attackCooldown || 1600,
+    killReward: b.killReward || 20000,
+  };
+  
+  gameState.enemies.set(boss.id, boss);
+  console.log(`⚔️ Custom boss "${b.name}" spawned!`);
+}
+
 // ===========================================
 // PROJECTILE CREATION
 // ===========================================
@@ -2787,37 +2883,42 @@ function gameTick() {
       // Dungeon-specific bounds - room-based layout
       // Dungeon is 1800 wide x 6000 tall (expanded)
       if (player.inDungeon) {
-        // Dungeon layout: entrance -> corridors -> rooms -> dragon lair
         const y = player.y;
-        let minX = 50, maxX = 1750; // Much wider dungeon (1800 total)
+        const cfg = player.customDungeonConfig;
         
-        // Different room widths
-        if (y < 500) {
-          // Entrance chamber - medium width
-          minX = 400; maxX = 1400;
-        } else if (y < 700 || (y >= 1500 && y < 1700) || (y >= 2500 && y < 2700) || 
-                   (y >= 3500 && y < 3700) || (y >= 4500 && y < 4700)) {
-          // Corridors - narrow
-          minX = 550; maxX = 1250;
-        } else if (y >= 5000) {
-          // Dragon lair - massive wide arena
-          minX = 50; maxX = 1750;
+        if (cfg) {
+          // CUSTOM DUNGEON - use config-driven bounds
+          const bounds = getDungeonBounds(cfg, y);
+          player.x = clamp(player.x, bounds.minX, bounds.maxX);
+          player.y = clamp(player.y, 50, cfg.layout.totalHeight - 100);
+          
+          // Track room from config
+          player.dungeonRoom = getDungeonRoom(cfg, y);
         } else {
-          // Regular rooms - wide
-          minX = 200; maxX = 1600;
+          // DEFAULT DUNGEON - hardcoded layout
+          let minX = 50, maxX = 1750;
+          if (y < 500) {
+            minX = 400; maxX = 1400;
+          } else if (y < 700 || (y >= 1500 && y < 1700) || (y >= 2500 && y < 2700) || 
+                     (y >= 3500 && y < 3700) || (y >= 4500 && y < 4700)) {
+            minX = 550; maxX = 1250;
+          } else if (y >= 5000) {
+            minX = 50; maxX = 1750;
+          } else {
+            minX = 200; maxX = 1600;
+          }
+          
+          player.x = clamp(player.x, minX, maxX);
+          player.y = clamp(player.y, 50, 5900);
+          
+          if (y < 500) player.dungeonRoom = 0;
+          else if (y < 1500) player.dungeonRoom = 1;
+          else if (y < 2500) player.dungeonRoom = 2;
+          else if (y < 3500) player.dungeonRoom = 3;
+          else if (y < 4500) player.dungeonRoom = 4;
+          else if (y < 5000) player.dungeonRoom = 5;
+          else player.dungeonRoom = 6;
         }
-        
-        player.x = clamp(player.x, minX, maxX);
-        player.y = clamp(player.y, 50, 5900); // Taller dungeon
-        
-        // Track dungeon room/depth for client rendering
-        if (y < 500) player.dungeonRoom = 0; // Entrance
-        else if (y < 1500) player.dungeonRoom = 1; // Room 1
-        else if (y < 2500) player.dungeonRoom = 2; // Room 2 (mini-boss)
-        else if (y < 3500) player.dungeonRoom = 3; // Room 3
-        else if (y < 4500) player.dungeonRoom = 4; // Room 4 (mini-boss)
-        else if (y < 5000) player.dungeonRoom = 5; // Room 5
-        else player.dungeonRoom = 6; // Dragon lair
       }
     }
     
@@ -2825,7 +2926,50 @@ function gameTick() {
     if (player.inDungeon) {
       const currentRoom = player.dungeonRoom || 0;
       const lastRoom = player.dungeonRoomCleared || -1;
+      const cfg = player.customDungeonConfig;
       
+      if (cfg) {
+        // ===== CUSTOM DUNGEON SPAWNING =====
+        // Boss room (roomIndex === -1)
+        if (currentRoom === -1 && !player.dragonSpawned) {
+          player.dragonSpawned = true; // reuse flag for "boss spawned"
+          spawnCustomBoss(cfg, player);
+          io.emit('chat', { type: 'system', text: `⚔️ ${player.name} has reached the final chamber! ${cfg.boss.name.toUpperCase()} AWAKENS!` });
+          io.emit('dragonAwakens', { x: cfg.layout.bossCenter.x, y: cfg.layout.bossCenter.y });
+        }
+        
+        // Room enemies (positive roomIndex)
+        if (currentRoom > lastRoom && currentRoom > 0) {
+          player.dungeonRoomCleared = currentRoom;
+          const enemies = getRoomEnemies(cfg, currentRoom);
+          const centerY = getRoomCenterY(cfg, currentRoom);
+          const depthMultiplier = cfg.difficultyMultiplier * (1 + currentRoom * 0.2);
+          
+          for (const type of enemies) {
+            const template = ENEMY_TYPES[type];
+            if (!template) continue;
+            const spawnX = 400 + Math.random() * 1000;
+            const spawnY = centerY + (Math.random() - 0.5) * 400;
+            const enemy = {
+              id: uuidv4(), type, name: template.name,
+              health: Math.round(template.health * depthMultiplier),
+              maxHealth: Math.round(template.health * depthMultiplier),
+              baseSpeed: template.speed, damage: Math.round(template.damage * depthMultiplier),
+              radius: template.radius, xp: Math.round(template.xp * depthMultiplier),
+              color: template.color, behavior: template.behavior,
+              x: spawnX, y: spawnY, spawnX, spawnY,
+              zone: 'dungeon', targetId: null, slowedUntil: 0, lastAttack: 0,
+              createdAt: Date.now(), inDungeon: true, isDungeon: true,
+              isMiniBoss: template.isMiniBoss || false,
+              chargeSpeed: template.chargeSpeed, chargeDistance: template.chargeDistance,
+              attackCooldown: template.attackCooldown, summonCount: template.summonCount,
+            };
+            gameState.enemies.set(enemy.id, enemy);
+          }
+          console.log(`🏰 Custom room ${currentRoom} spawned for ${player.name}`);
+        }
+      } else {
+        // ===== DEFAULT DRAGON'S GAUNTLET SPAWNING =====
       // Spawn dragon when entering dragon lair (room 6)
       if (currentRoom === 6 && !player.dragonSpawned) {
         player.dragonSpawned = true;
@@ -2902,6 +3046,7 @@ function gameTick() {
         
         console.log(`🏰 Room ${currentRoom} enemies spawned for ${player.name}`);
       }
+      } // end default dungeon
     }
 
     // Animation frame
@@ -4202,6 +4347,10 @@ function gameTick() {
         isHealing: p.isHealing || false,
         bossKills: p.bossKills || {},
         inDungeon: p.inDungeon || false,
+        damageMultiplier: p.damageMultiplier || 1,
+        speedMultiplier: p.speedMultiplier || 1,
+        cooldownMultiplier: p.cooldownMultiplier || 1,
+        isAdmin: p.isAdmin || false,
       })),
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,
@@ -4307,7 +4456,7 @@ io.on('connection', (socket) => {
     // Check if azoni account - auto-grant admin
     const isAzoniAccount = playerName?.toLowerCase() === 'azoni';
     
-    // Validate class - voidlord requires admin key or azoni account
+    // Validate class - voidlord is available to all players
     let validatedClass = playerClass;
     let isAdmin = false;
     if (playerClass === 'voidlord') {
@@ -4316,8 +4465,7 @@ io.on('connection', (socket) => {
         isAdmin = true;
         console.log(`Admin ${playerName} authenticated as Void Lord`);
       } else {
-        validatedClass = 'pyromancer'; // Default if wrong key
-        console.log(`Invalid admin key attempt from ${playerName}`);
+        console.log(`${playerName} selected Void Lord`);
       }
     }
     const classData = CLASSES[validatedClass] || CLASSES.pyromancer;
@@ -4364,12 +4512,15 @@ io.on('connection', (socket) => {
       alternateSpells: saved?.alternateSpells || {}, // { slot: spellId }
       bossKills: saved?.bossKills || {}, // Track defeated zone bosses
       questComplete: saved?.questComplete || false,
+      upgrades: saved?.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 },
       x: 3000, // Sanctuary center
       y: 2500,
-      health: classData.baseHealth + healthBonus,
-      maxHealth: classData.baseHealth + healthBonus,
+      health: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5,
+      maxHealth: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5,
       baseSpeed: classData.baseSpeed + speedBonus,
-      damageMultiplier,
+      damageMultiplier: damageMultiplier * Math.pow(1.01, saved?.upgrades?.damage || 0),
+      speedMultiplier: Math.pow(1.01, saved?.upgrades?.speed || 0),
+      cooldownMultiplier: Math.pow(0.99, saved?.upgrades?.cooldown || 0),
       input: { up: false, down: false, left: false, right: false },
       lastCast: {},
       castCount: {}, // Track cast count for "every Nth" effects
@@ -4405,6 +4556,10 @@ io.on('connection', (socket) => {
         unlockedSkins: player.unlockedSkins,
         rank,
         damageMultiplier: player.damageMultiplier,
+        speedMultiplier: player.speedMultiplier || 1,
+        cooldownMultiplier: player.cooldownMultiplier || 1,
+        upgrades: player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0 },
+        isAdmin: player.isAdmin || false,
         bossKills: player.bossKills,
         questComplete: player.questComplete,
       },
@@ -4890,26 +5045,32 @@ io.on('connection', (socket) => {
         // Apply upgrade
         if (type === 'health') {
           player.upgrades.health += 1;
-          player.maxHealth += 20;
-          player.health = Math.min(player.health + 20, player.maxHealth);
+          player.maxHealth += 5;
+          player.health = Math.min(player.health + 5, player.maxHealth);
         } else if (type === 'damage') {
           player.upgrades.damage += 1;
-          player.damageMultiplier = (player.damageMultiplier || 1) * 1.05;
+          player.damageMultiplier = (player.damageMultiplier || 1) * 1.01;
         } else if (type === 'speed') {
           player.upgrades.speed += 1;
-          player.speedMultiplier = (player.speedMultiplier || 1) * 1.05;
+          player.speedMultiplier = (player.speedMultiplier || 1) * 1.01;
         } else if (type === 'cooldown') {
           player.upgrades.cooldown += 1;
-          player.cooldownMultiplier = (player.cooldownMultiplier || 1) * 0.95;
+          player.cooldownMultiplier = (player.cooldownMultiplier || 1) * 0.99;
         }
         
         socket.emit('upgradePurchased', { 
           type, 
           totalXp: player.totalXp,
           upgrades: player.upgrades,
+          damageMultiplier: player.damageMultiplier || 1,
+          speedMultiplier: player.speedMultiplier || 1,
+          cooldownMultiplier: player.cooldownMultiplier || 1,
+          maxHealth: player.maxHealth,
+          health: player.health,
         });
         
         console.log(`💰 ${player.name} bought ${type} upgrade (cost: ${cost} XP)`);
+        savePlayerToDb(player);
         break;
       }
     }
@@ -5467,6 +5628,18 @@ io.on('connection', (socket) => {
             emoji: currentForm?.emoji || '🦋',
             openSkinSelect: true, // Special flag to open skin selector
           });
+        } else if (npc.type === 'dungeon_architect') {
+          // Dungeon Architect - open dungeon workshop
+          const greeting = npc.greetings[Math.floor(Math.random() * npc.greetings.length)];
+          socket.emit('npcDialogue', {
+            npcId: npc.id,
+            npcName: npc.name,
+            npcType: npc.type,
+            dialogue: [greeting],
+            prompt: 'What would you like to do?',
+            hasChoice: true,
+            openDungeonBrowser: true,
+          });
         }
         break;
       }
@@ -5545,11 +5718,113 @@ io.on('connection', (socket) => {
         player.inDungeon = false;
         player.dungeonProgress = 0;
         player.dungeonRoom = 0;
+        player.customDungeonId = null; // Clear custom dungeon
+        player.customDungeonConfig = null;
         
         socket.emit('exitedDungeon', {
           x: player.x,
           y: player.y,
         });
+        break;
+      }
+    }
+  });
+
+  // ===========================================
+  // CUSTOM DUNGEON EVENTS
+  // ===========================================
+
+  // Create a custom dungeon via prompt
+  socket.on('createCustomDungeon', ({ prompt }) => {
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
+      socket.emit('customDungeonError', { message: 'Please describe your dungeon idea (at least 3 characters).' });
+      return;
+    }
+
+    let player = null;
+    for (const p of gameState.players.values()) {
+      if (p.socketId === socket.id) { player = p; break; }
+    }
+    if (!player) return;
+
+    try {
+      const config = generateDungeon(prompt.trim(), player.name, player.id);
+      
+      // Store the dungeon
+      gameState.customDungeons.set(config.id, config);
+      
+      // Cap stored dungeons to 50 (remove oldest)
+      if (gameState.customDungeons.size > 50) {
+        const oldest = [...gameState.customDungeons.entries()]
+          .sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+        if (oldest) gameState.customDungeons.delete(oldest[0]);
+      }
+
+      socket.emit('customDungeonCreated', { dungeon: sanitizeDungeonForClient(config) });
+      
+      io.emit('chat', {
+        type: 'system',
+        text: `🏗️ ${player.name} created a new dungeon: "${config.name}" [${config.difficulty}]`,
+      });
+
+      console.log(`🏗️ Custom dungeon created: "${config.name}" by ${player.name}`);
+    } catch (err) {
+      socket.emit('customDungeonError', { message: err.message || 'Failed to generate dungeon.' });
+    }
+  });
+
+  // List available custom dungeons
+  socket.on('listCustomDungeons', () => {
+    const dungeons = [...gameState.customDungeons.values()]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 20)
+      .map(sanitizeDungeonForClient);
+    socket.emit('customDungeonList', { dungeons });
+  });
+
+  // Enter a custom dungeon
+  socket.on('enterCustomDungeon', ({ dungeonId }) => {
+    const config = gameState.customDungeons.get(dungeonId);
+    if (!config) {
+      socket.emit('customDungeonError', { message: 'Dungeon not found.' });
+      return;
+    }
+
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        // Store pre-dungeon position
+        player.preDungeonX = player.x;
+        player.preDungeonY = player.y;
+
+        // Transport to custom dungeon entrance
+        const layout = config.layout;
+        player.x = layout.width / 2;
+        player.y = 350;
+        player.inDungeon = true;
+        player.dungeonProgress = 0;
+        player.dungeonWaveSpawned = 0;
+        player.dungeonRoom = 0;
+        player.dungeonRoomCleared = -1;
+        player.dragonSpawned = false;
+        player.customDungeonId = config.id;
+        player.customDungeonConfig = config;
+
+        // Increment play count
+        config.plays++;
+
+        socket.emit('enteredDungeon', {
+          x: player.x,
+          y: player.y,
+          zone: 'dungeon',
+          customDungeon: sanitizeDungeonForClient(config),
+        });
+
+        io.emit('chat', {
+          type: 'system',
+          text: `⚔️ ${player.name} entered "${config.name}" (${config.difficulty})!`,
+        });
+
+        console.log(`⚔️ ${player.name} entered custom dungeon: "${config.name}"`);
         break;
       }
     }
