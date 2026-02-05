@@ -3250,11 +3250,13 @@ function gameTick() {
 
     // Auto-cast spells (unless autoAttack is disabled)
     if (player.autoAttack !== false) {
+      // Custom wizards have spells on player object directly, otherwise use CLASSES lookup
       const classData = CLASSES[player.class];
+      const playerSpells = player.spells || (classData ? classData.spells : []);
       const playerInDungeon = player.inDungeon || false;
       
-      if (classData) {
-        for (const spellId of classData.spells) {
+      if (playerSpells && playerSpells.length > 0) {
+        for (const spellId of playerSpells) {
           const spell = SPELLS[spellId];
           if (!spell) continue;
 
@@ -4496,20 +4498,29 @@ function gameTick() {
     // Cooldowns for this player
     const classData = CLASSES[player.class];
     const cooldowns = {};
-    if (classData) {
-      for (const spellId of classData.spells) {
+    
+    // Use player.spells for custom wizards, otherwise CLASSES lookup
+    const playerSpells = player.spells || (classData ? classData.spells : []);
+    if (playerSpells) {
+      for (const spellId of playerSpells) {
         const spell = SPELLS[spellId];
         if (spell) {
           const lastCast = player.lastCast?.[spellId] || 0;
           cooldowns[spellId] = { remaining: Math.max(0, spell.cooldown - (now - lastCast)), total: spell.cooldown };
         }
       }
-      if (classData.dashAbility) {
-        cooldowns.dash = { remaining: Math.max(0, classData.dashAbility.cooldown - (now - (player.lastDash || 0))), total: classData.dashAbility.cooldown };
-      }
-      if (classData.ultimateAbility) {
-        cooldowns.ultimate = { remaining: Math.max(0, classData.ultimateAbility.cooldown - (now - (player.lastUltimate || 0))), total: classData.ultimateAbility.cooldown };
-      }
+    }
+    
+    // Dash cooldown - check player first, then CLASSES
+    const dashAbility = player.dashAbility || classData?.dashAbility;
+    if (dashAbility) {
+      cooldowns.dash = { remaining: Math.max(0, dashAbility.cooldown - (now - (player.lastDash || 0))), total: dashAbility.cooldown };
+    }
+    
+    // Ultimate cooldown - check player first, then CLASSES
+    const ultAbility = player.ultimateAbility || classData?.ultimateAbility;
+    if (ultAbility) {
+      cooldowns.ultimate = { remaining: Math.max(0, ultAbility.cooldown - (now - (player.lastUltimate || 0))), total: ultAbility.cooldown };
     }
     
     // Get nearby NPCs
@@ -4952,10 +4963,11 @@ io.on('connection', (socket) => {
     
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id && player.health > 0) {
+        // Custom wizards have dashAbility on player object, otherwise use CLASSES lookup
         const classData = CLASSES[player.class];
-        if (!classData?.dashAbility) break;
+        const dash = player.dashAbility || classData?.dashAbility;
+        if (!dash) break;
         
-        const dash = classData.dashAbility;
         const lastDash = player.lastDash || 0;
         const now = Date.now();
         
@@ -5055,10 +5067,11 @@ io.on('connection', (socket) => {
     
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id && player.health > 0) {
+        // Custom wizards have ultimateAbility on player object, otherwise use CLASSES lookup
         const classData = CLASSES[player.class];
-        if (!classData?.ultimateAbility) break;
+        const ult = player.ultimateAbility || classData?.ultimateAbility;
+        if (!ult) break;
         
-        const ult = classData.ultimateAbility;
         const lastUlt = player.lastUltimate || 0;
         const now = Date.now();
         
@@ -5279,6 +5292,28 @@ io.on('connection', (socket) => {
           }, ult.duration / ult.waves);
           
           io.emit('sound', { type: 'arrowStorm', x: stormX, y: stormY });
+        } else {
+          // Generic ultimate for custom wizards - simple AOE explosion
+          const explosionX = tx ?? player.x;
+          const explosionY = ty ?? player.y;
+          
+          // Show warning
+          io.emit('meteorWarning', { x: explosionX, y: explosionY, radius: ult.radius, delay: ult.delay || 1000 });
+          
+          setTimeout(() => {
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+              if (distance(enemy, { x: explosionX, y: explosionY }) < ult.radius) {
+                enemy.health -= ult.damage;
+                spawnDamageNumber(enemy.x, enemy.y - 20, ult.damage);
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+            io.emit('explosion', { x: explosionX, y: explosionY, radius: ult.radius, color: player.color || '#a78bfa' });
+            spawnParticles(explosionX, explosionY, player.color || '#a78bfa', 20);
+            io.emit('sound', { type: 'meteor', x: explosionX, y: explosionY });
+          }, ult.delay || 1000);
         }
         
         socket.emit('ultimateUsed', { cooldown: ult.cooldown });
@@ -6361,9 +6396,7 @@ io.on('connection', (socket) => {
   });
 
   // Select a custom AI wizard class for current character
-  socket.on('selectCustomWizard', ({ classId }) => {
-    if (!isAdminSocket(socket.id) && !socket.isAdmin) return;
-    
+  socket.on('selectCustomWizard', async ({ classId, sessionToken }) => {
     const player = getPlayerBySocket(socket.id);
     if (!player) return;
 
