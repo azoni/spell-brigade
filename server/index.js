@@ -6283,36 +6283,37 @@ io.on('connection', (socket) => {
   // ===========================================
   // AI WIZARD CREATOR (Admin only)
   // ===========================================
+  // Rate limit tracking for wizard generation
+  const wizardRateLimits = {};
+  
   socket.on('generateWizard', async ({ prompt, sessionToken }) => {
-    console.log(`🧙 generateWizard called - socket: ${socket.id}, socketIsAdmin: ${socket.isAdmin}, sessionToken: ${sessionToken ? sessionToken.slice(0,8) + '...' : 'NONE'}`);
-    
-    // Primary check: socket-level or player-level admin
+    // Check admin status (for "Play as" feature later)
     let isAdmin = isAdminSocket(socket.id);
-    
-    // Fallback: verify via session token directly
     if (!isAdmin && sessionToken && sessionsDb[sessionToken]) {
       const session = sessionsDb[sessionToken];
-      console.log(`🧙 Session fallback - isGuest: ${session.isGuest}, userId: ${session.userId}`);
       if (!session.isGuest && session.userId) {
         const user = await loadUserFromDb(session.userId);
-        console.log(`🧙 Session user: ${user?.username}`);
         if (user?.username?.toLowerCase() === 'azoni') {
           isAdmin = true;
           socket.isAdmin = true;
-          console.log(`🔑 generateWizard: admin verified via session fallback`);
         }
       }
-    } else if (!isAdmin && sessionToken) {
-      console.log(`🧙 Session token provided but NOT in sessionsDb. Active sessions: ${Object.keys(sessionsDb).length}`);
-    } else if (!isAdmin) {
-      console.log(`🧙 No session token provided in payload`);
     }
     
+    // Rate limit: non-admin users get 5 generations per 10 minutes
     if (!isAdmin) {
-      console.log(`🔑 generateWizard denied for socket ${socket.id} - not admin`);
-      socket.emit('wizardGenerateError', { message: 'AI wizard creation is admin-only during testing.' });
-      return;
+      const now = Date.now();
+      const key = sessionToken || socket.id;
+      if (!wizardRateLimits[key]) wizardRateLimits[key] = [];
+      // Clean old entries
+      wizardRateLimits[key] = wizardRateLimits[key].filter(t => now - t < 600000);
+      if (wizardRateLimits[key].length >= 5) {
+        socket.emit('wizardGenerateError', { message: 'Rate limit reached. Please wait a few minutes before generating again.' });
+        return;
+      }
+      wizardRateLimits[key].push(now);
     }
+    
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
       socket.emit('wizardGenerateError', { message: 'Please describe your wizard idea (at least 3 characters).' });
       return;
@@ -6361,7 +6362,7 @@ io.on('connection', (socket) => {
 
   // Select a custom AI wizard class for current character
   socket.on('selectCustomWizard', ({ classId }) => {
-    if (!isAdminSocket(socket.id)) return;
+    if (!isAdminSocket(socket.id) && !socket.isAdmin) return;
     
     const player = getPlayerBySocket(socket.id);
     if (!player) return;

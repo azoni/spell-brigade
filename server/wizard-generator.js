@@ -8,6 +8,10 @@ import { llmGenerate, isLLMEnabled } from './openrouter.js';
 const WIZARD_LLM_PROMPT = `You are a game designer for Spell Brigade, a 2D multiplayer wizard arena game.
 Create a custom wizard class from the user's description. The wizard must be balanced for PvE combat.
 
+IMPORTANT: Pay close attention to the user's description. If they specify spell names, abilities, lore details, 
+elemental themes, or gameplay mechanics, incorporate those directly into the generated class. Honor their creative 
+vision while keeping the stats balanced within the ranges below.
+
 EXISTING CLASSES FOR REFERENCE (to keep balance similar):
 - Pyromancer: HP 80, Speed 160, Spell1: 28dmg/900ms/projectile, Spell2: 18dmg/1500ms/AOE
 - Cryomancer: HP 90, Speed 150, Spell1: 18dmg/500ms/projectile+slow, Spell2: 12dmg/2500ms/AOE+slow  
