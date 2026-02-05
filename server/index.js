@@ -1458,7 +1458,7 @@ const ENEMY_TYPES = {
     health: 40000,
     damage: 150,
     speed: 55,
-    radius: 120,
+    radius: 80,
     xp: 15000,
     color: '#b91c1c',
     behavior: 'boss_dragon',
@@ -4452,8 +4452,11 @@ function gameTick() {
         isFrozen: e.frozenUntil > now,
         isBoss: e.isBoss || false,
         isMiniBoss: e.isMiniBoss || false,
+        isCustomBoss: e.isCustomBoss || false,
         behavior: e.behavior,
         isCharging: e.isCharging || false,
+        color: e.color || undefined,
+        phase: e.phase || undefined,
       }));
     
     const nearbyProjectiles = [...gameState.projectiles.values()]
@@ -4462,6 +4465,8 @@ function gameTick() {
         id: p.id, x: Math.round(p.x), y: Math.round(p.y),
         radius: p.radius, color: p.color, trailColor: p.trailColor,
         spellId: p.spellId, ownerClass: p.ownerClass, level: p.ownerLevel || 1,
+        vx: p.vx ? Math.round(p.vx) : undefined,
+        vy: p.vy ? Math.round(p.vy) : undefined,
       }));
     
     const nearbyOrbs = [...gameState.xpOrbs.values()]
