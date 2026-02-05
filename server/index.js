@@ -2123,8 +2123,12 @@ function getPlayerBySocket(socketId) {
 
 // Helper: Check if socket belongs to admin
 function isAdminSocket(socketId) {
+  // Check gameState players first
   const p = getPlayerBySocket(socketId);
-  return p?.isAdmin === true;
+  if (p?.isAdmin) return true;
+  // Check socket-level admin flag (set before join)
+  const sock = io.sockets.sockets.get(socketId);
+  return sock?.isAdmin === true;
 }
 
 function normalize(vec) {
@@ -4642,6 +4646,19 @@ io.on('connection', (socket) => {
   // Send available classes
   socket.emit('classes', CLASSES);
 
+  // Pre-join admin authentication (so wizard creator works from title screen)
+  socket.on('authenticateAdmin', async ({ sessionToken }) => {
+    if (!sessionToken || !sessionsDb[sessionToken]) return;
+    const session = sessionsDb[sessionToken];
+    if (session.isGuest || !session.userId) return;
+    const user = await loadUserFromDb(session.userId);
+    if (user?.username?.toLowerCase() === 'azoni') {
+      socket.isAdmin = true;
+      socket.emit('adminAuthenticated', { success: true });
+      console.log(`🔑 Socket ${socket.id} pre-authenticated as admin`);
+    }
+  });
+
   socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey, sessionToken }) => {
     // Prevent double-join from same socket
     for (const p of gameState.players.values()) {
@@ -5510,7 +5527,18 @@ io.on('connection', (socket) => {
       };
       
       const levelReqs = { 1: 10, 2: 20, 3: 30 };
-      const abilityId = abilityMap[player.class]?.[abilitySlot];
+      
+      // Check custom wizard abilities first
+      let abilityId;
+      if (player.isCustomWizard && player.customClassId) {
+        const customWiz = gameState.customWizards.get(player.customClassId);
+        if (customWiz?.classDef?.abilities) {
+          abilityId = customWiz.classDef.abilities[abilitySlot];
+        }
+      }
+      if (!abilityId) {
+        abilityId = abilityMap[player.class]?.[abilitySlot];
+      }
       
       if (!abilityId) {
         socket.emit('abilityError', { message: 'Invalid ability slot' });
@@ -5953,6 +5981,36 @@ io.on('connection', (socket) => {
         });
         spawnParticles(player.x, player.y, '#000', 10);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (spell.type === 'classAbility') {
+        // Generic custom wizard ability - AOE damage burst
+        const abilityDmg = spell.damage * (player.damageMultiplier || 1);
+        const abilityRadius = spell.radius || 150;
+        
+        // Deal damage to nearby enemies
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+          if (distance(enemy, player) < abilityRadius) {
+            enemy.health -= abilityDmg;
+            if (enemy.health <= 0) {
+              handleEnemyDeath(enemy, player, io);
+            }
+          }
+        }
+        
+        // Broadcast visual effect to all players
+        io.emit('customAbilityEffect', {
+          playerId: player.id,
+          x: player.x,
+          y: player.y,
+          radius: abilityRadius,
+          color: spell.color || player.color || '#a78bfa',
+          name: spell.name,
+          duration: spell.duration || 3000,
+        });
+        
+        spawnParticles(player.x, player.y, spell.color || '#a78bfa', 15);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
       }
       
       break;
@@ -6222,8 +6280,9 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Player may not exist yet if generating from title screen
     const player = getPlayerBySocket(socket.id);
-    if (!player) return;
+    const creatorName = player?.name || 'Admin';
 
     try {
       socket.emit('wizardGenerateStatus', { message: '🧙 AI is crafting your wizard...' });
@@ -6238,7 +6297,7 @@ io.on('connection', (socket) => {
       gameState.customWizards.set(result.classId, {
         classDef: result.classDef,
         spellDefs: result.spellDefs,
-        createdBy: player.name,
+        createdBy: creatorName,
         createdAt: Date.now(),
       });
 
@@ -6248,7 +6307,7 @@ io.on('connection', (socket) => {
         if (oldest) gameState.customWizards.delete(oldest[0]);
       }
 
-      console.log(`🧙 Custom wizard created: "${result.classDef.name}" by ${player.name}`);
+      console.log(`🧙 Custom wizard created: "${result.classDef.name}" by ${creatorName}`);
 
       // Send back the generated wizard info to the client
       socket.emit('wizardGenerated', {
