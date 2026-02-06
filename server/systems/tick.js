@@ -309,7 +309,7 @@ export function gameTick() {
             }
 
             // Voidlord can also target other players (only if PvP is enabled)
-            if (classData.canPvP && player.pvpEnabled === true) {
+            if (classData?.canPvP && player.pvpEnabled === true) {
               for (const otherPlayer of gameState.players.values()) {
                 if (otherPlayer.id === player.id || otherPlayer.health <= 0) continue;
                 const dist = distance(player, otherPlayer);
