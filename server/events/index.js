@@ -928,7 +928,11 @@ io.on('connection', (socket) => {
           return;
         }
         
-        const costs = {
+        player.upgrades = player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 };
+        const currentLevel = player.upgrades[type] || 0;
+        
+        // Exponential cost scaling based on current level
+        const baseCosts = {
           health: 500,
           damage: 750,
           speed: 600,
@@ -936,40 +940,81 @@ io.on('connection', (socket) => {
           attackSpeed: 800,
         };
         
-        const cost = costs[type];
-        if (!cost) {
+        const baseCost = baseCosts[type];
+        if (!baseCost) {
           socket.emit('shopError', { message: 'Invalid upgrade type' });
           return;
         }
         
+        // Cost scaling: moderate 10-50, steep 50-100, exponential 100+, extreme 200+
+        let costMultiplier;
+        if (currentLevel < 10) {
+          costMultiplier = 1 + currentLevel * 0.1;
+        } else if (currentLevel < 50) {
+          costMultiplier = 1 + currentLevel * 0.2 + Math.pow(currentLevel / 20, 2);
+        } else if (currentLevel < 100) {
+          costMultiplier = 1 + currentLevel * 0.3 + Math.pow(currentLevel / 15, 2);
+        } else if (currentLevel < 200) {
+          costMultiplier = 1 + currentLevel * 0.5 + Math.pow(currentLevel / 12, 3);
+        } else {
+          costMultiplier = 1 + currentLevel * 0.5 + Math.pow(currentLevel / 12, 3) + Math.pow(currentLevel / 50, 4);
+        }
+        
+        const cost = Math.floor(baseCost * costMultiplier);
+        
         if (player.totalXp < cost) {
-          socket.emit('shopError', { message: 'Not enough XP' });
+          socket.emit('shopError', { message: `Not enough XP (need ${cost})` });
           return;
         }
+        
+        // Soft caps - diminishing returns
+        const softCaps = {
+          damage: { maxMultiplier: 2.5 },     // Max 2.5x damage
+          speed: { maxMultiplier: 1.6 },       // Max 1.6x speed
+          cooldown: { minMultiplier: 0.4 },    // Min 0.4x cooldown (60% reduction)
+          attackSpeed: { minMultiplier: 0.5 }, // Min 0.5x attack speed
+        };
+        
+        // Calculate diminishing effectiveness (drops to ~20% at very high levels)
+        const effectiveness = Math.max(0.2, 1 / (1 + currentLevel / 200));
         
         // Deduct XP
         player.totalXp -= cost;
         
-        // Initialize upgrades if not exist
-        player.upgrades = player.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 };
-        
-        // Apply upgrade
+        // Apply upgrade with diminishing returns
         if (type === 'health') {
           player.upgrades.health += 1;
-          player.maxHealth += 5;
-          player.health = Math.min(player.health + 5, player.maxHealth);
+          const healthGain = Math.max(1, Math.floor(5 * effectiveness));
+          player.maxHealth += healthGain;
+          player.health = Math.min(player.health + healthGain, player.maxHealth);
         } else if (type === 'damage') {
           player.upgrades.damage += 1;
-          player.damageMultiplier = (player.damageMultiplier || 1) * 1.01;
+          const boost = 1 + (0.01 * effectiveness);
+          player.damageMultiplier = Math.min(
+            (player.damageMultiplier || 1) * boost,
+            softCaps.damage.maxMultiplier
+          );
         } else if (type === 'speed') {
           player.upgrades.speed += 1;
-          player.speedMultiplier = (player.speedMultiplier || 1) * 1.01;
+          const boost = 1 + (0.01 * effectiveness);
+          player.speedMultiplier = Math.min(
+            (player.speedMultiplier || 1) * boost,
+            softCaps.speed.maxMultiplier
+          );
         } else if (type === 'cooldown') {
           player.upgrades.cooldown += 1;
-          player.cooldownMultiplier = (player.cooldownMultiplier || 1) * 0.99;
+          const reduction = 1 - (0.01 * effectiveness);
+          player.cooldownMultiplier = Math.max(
+            (player.cooldownMultiplier || 1) * reduction,
+            softCaps.cooldown.minMultiplier
+          );
         } else if (type === 'attackSpeed') {
           player.upgrades.attackSpeed += 1;
-          player.attackSpeedMultiplier = (player.attackSpeedMultiplier || 1) * 0.98;
+          const reduction = 1 - (0.02 * effectiveness);
+          player.attackSpeedMultiplier = Math.max(
+            (player.attackSpeedMultiplier || 1) * reduction,
+            softCaps.attackSpeed.minMultiplier
+          );
         }
         
         socket.emit('upgradePurchased', { 
@@ -982,9 +1027,10 @@ io.on('connection', (socket) => {
           attackSpeedMultiplier: player.attackSpeedMultiplier || 1,
           maxHealth: player.maxHealth,
           health: player.health,
+          cost,
         });
         
-        console.log(`💰 ${player.name} bought ${type} upgrade (cost: ${cost} XP)`);
+        console.log(`💰 ${player.name} bought ${type} upgrade #${currentLevel + 1} (cost: ${cost} XP)`);
         savePlayerToDb(player);
         break;
       }

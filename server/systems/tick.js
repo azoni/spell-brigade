@@ -618,57 +618,114 @@ export function gameTick() {
         const attackType = template?.attackType;
         
         if (attackType === 'spore_burst') {
-          // Blossom Behemoth: Shoot homing spores at nearby players
+          // Blossom Behemoth: Shoot fast spore projectiles in a spread pattern
+          const numSpores = 8 + Math.floor(Math.random() * 5); // 8-12 spores
+          for (let i = 0; i < numSpores; i++) {
+            const angle = (i / numSpores) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+            const id = 'spore_' + Math.random().toString(36).substr(2, 9);
+            gameState.projectiles.set(id, {
+              id,
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(angle) * 180,
+              vy: Math.sin(angle) * 180,
+              damage: 20,
+              radius: 12,
+              color: '#84cc16',
+              trailColor: '#a3e635',
+              fromEnemy: true,
+              maxRange: 500,
+              traveled: 0,
+              createdAt: now,
+              canHitPlayers: true,
+            });
+          }
+          // Also shoot targeted spores at each nearby player
           for (const player of alivePlayers) {
             const playerZone = getZoneAtPosition(player.x, player.y);
-            if (playerZone?.id === 'sanctuary') continue; // Skip players in sanctuary
-            if (distance(enemy, player) < 400) {
-              // Create homing spore projectile
-              const id = 'spore_' + Math.random().toString(36).substr(2, 9);
+            if (playerZone?.id === 'sanctuary') continue;
+            if (distance(enemy, player) < 600) {
+              const dir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
+              const id = 'spore_t_' + Math.random().toString(36).substr(2, 9);
               gameState.projectiles.set(id, {
                 id,
                 x: enemy.x,
                 y: enemy.y,
-                targetId: player.id,
-                speed: 120,
-                damage: 15,
-                radius: 10,
-                color: '#84cc16',
+                vx: dir.x * 200,
+                vy: dir.y * 200,
+                damage: 18,
+                radius: 14,
+                color: '#65a30d',
+                trailColor: '#84cc16',
                 fromEnemy: true,
-                lifetime: 5000,
+                maxRange: 600,
+                traveled: 0,
                 createdAt: now,
+                canHitPlayers: true,
               });
             }
           }
           io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
-          spawnParticles(enemy.x, enemy.y, '#84cc16', 12);
+          io.emit('sporeWave', { x: enemy.x, y: enemy.y, count: numSpores });
+          spawnParticles(enemy.x, enemy.y, '#84cc16', 16);
         }
         
         else if (attackType === 'root_trap') {
-          // Ancient Treant: Create damaging root zones
+          // Ancient Treant: Roots erupt at player positions with warning + knockback
+          for (const player of alivePlayers) {
+            const playerZone = getZoneAtPosition(player.x, player.y);
+            if (playerZone?.id === 'sanctuary') continue;
+            if (distance(enemy, player) < 500) {
+              const rx = player.x + (Math.random() - 0.5) * 40;
+              const ry = player.y + (Math.random() - 0.5) * 40;
+              
+              io.emit('rootWarning', { x: rx, y: ry, radius: 60, delay: 800 });
+              
+              setTimeout(() => {
+                io.emit('explosion', { x: rx, y: ry, radius: 60, color: '#166534' });
+                io.emit('rootErupt', { x: rx, y: ry });
+                for (const p of gameState.players.values()) {
+                  if (p.health <= 0 || p.invincible) continue;
+                  const d = distance({ x: rx, y: ry }, p);
+                  if (d < 60) {
+                    p.health -= 25;
+                    const knockDir = normalize({ x: p.x - rx, y: p.y - ry });
+                    p.x += knockDir.x * 120;
+                    p.y += knockDir.y * 120;
+                    io.to(p.socketId).emit('damaged', { amount: 25, fromX: rx, fromY: ry });
+                    spawnDamageNumber(p.x, p.y - 20, 25);
+                    if (p.health <= 0) {
+                      p.health = 0;
+                      p.deaths = (p.deaths || 0) + 1;
+                      io.to(p.socketId).emit('died', { killedBy: 'Ancient Treant', level: p.level, xp: p.xp });
+                      savePlayerToDb(p);
+                    }
+                  }
+                }
+              }, 800);
+            }
+          }
+          // Also spawn random area roots
           for (let i = 0; i < 3; i++) {
-            const angle = (Math.PI * 2 / 3) * i + Math.random() * 0.5;
-            const dist = 100 + Math.random() * 100;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 80 + Math.random() * 200;
             const rx = enemy.x + Math.cos(angle) * dist;
             const ry = enemy.y + Math.sin(angle) * dist;
-            
-            // Root trap as a "hazard projectile"
-            const id = 'root_' + Math.random().toString(36).substr(2, 9);
-            gameState.projectiles.set(id, {
-              id,
-              x: rx,
-              y: ry,
-              speed: 0,
-              damage: 20,
-              radius: 50,
-              color: '#166534',
-              fromEnemy: true,
-              isHazard: true,
-              lifetime: 3000,
-              createdAt: now,
-              pulseRate: 500,
-            });
-            io.emit('explosion', { x: rx, y: ry, radius: 50, color: '#166534' });
+            io.emit('rootWarning', { x: rx, y: ry, radius: 50, delay: 1000 });
+            setTimeout(() => {
+              io.emit('explosion', { x: rx, y: ry, radius: 50, color: '#166534' });
+              for (const p of gameState.players.values()) {
+                if (p.health <= 0 || p.invincible) continue;
+                if (distance({ x: rx, y: ry }, p) < 50) {
+                  p.health -= 20;
+                  const knockDir = normalize({ x: p.x - rx, y: p.y - ry });
+                  p.x += knockDir.x * 100;
+                  p.y += knockDir.y * 100;
+                  io.to(p.socketId).emit('damaged', { amount: 20, fromX: rx, fromY: ry });
+                  if (p.health <= 0) { p.health = 0; p.deaths = (p.deaths || 0) + 1; io.to(p.socketId).emit('died', { killedBy: 'Ancient Treant' }); }
+                }
+              }
+            }, 1000);
           }
           io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
         }
@@ -706,73 +763,97 @@ export function gameTick() {
         }
         
         else if (attackType === 'ice_breath') {
-          // Frost Wyrm: Cone attack that freezes and damages
-          const dir = nearestPlayer ? normalize({ 
-            x: nearestPlayer.x - enemy.x, 
-            y: nearestPlayer.y - enemy.y 
-          }) : { x: 1, y: 0 };
-          
-          const coneAngle = Math.PI / 3; // 60 degree cone
-          const coneRange = 250;
-          const baseAngle = Math.atan2(dir.y, dir.x);
-          
-          for (const player of alivePlayers) {
-            const toPlayer = { x: player.x - enemy.x, y: player.y - enemy.y };
-            const playerDist = Math.sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+          // Frost Wyrm: Freeze circle under nearest player (2s warning, 3s freeze)
+          if (nearestPlayer) {
+            const freezeX = nearestPlayer.x;
+            const freezeY = nearestPlayer.y;
+            const freezeRadius = 120;
+            const freezeDelay = 2000;
             
-            if (playerDist < coneRange) {
-              const playerAngle = Math.atan2(toPlayer.y, toPlayer.x);
-              let angleDiff = Math.abs(playerAngle - baseAngle);
-              if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+            io.emit('freezeCircleWarning', { 
+              x: freezeX, y: freezeY, 
+              radius: freezeRadius, 
+              delay: freezeDelay,
+              color: '#22d3ee',
+            });
+            
+            setTimeout(() => {
+              io.emit('freezeCircleExplode', { x: freezeX, y: freezeY, radius: freezeRadius });
+              io.emit('iceNova', { x: freezeX, y: freezeY, radius: freezeRadius });
               
-              if (angleDiff < coneAngle / 2) {
-                if (player.invincible) continue; // Admin invincibility
-                player.health -= 35;
-                player.frozenUntil = now + 2000;
-                io.to(player.socketId).emit('damaged', { amount: 35, fromX: enemy.x, fromY: enemy.y });
-                if (player.health <= 0) {
-                  player.health = 0;
-                  player.deaths = (player.deaths || 0) + 1;
-                  io.to(player.socketId).emit('died', { killedBy: 'Frost Wyrm', level: player.level, xp: player.xp });
-                  savePlayerToDb(player);
+              for (const player of gameState.players.values()) {
+                if (player.health <= 0 || player.invincible) continue;
+                if (distance({ x: freezeX, y: freezeY }, player) < freezeRadius) {
+                  player.frozenUntil = Date.now() + 3000;
+                  player.health -= 40;
+                  io.to(player.socketId).emit('damaged', { amount: 40, fromX: freezeX, fromY: freezeY });
+                  io.to(player.socketId).emit('frozen', { duration: 3000 });
+                  spawnDamageNumber(player.x, player.y - 20, 40);
+                  if (player.health <= 0) {
+                    player.health = 0;
+                    player.deaths = (player.deaths || 0) + 1;
+                    io.to(player.socketId).emit('died', { killedBy: 'Frost Wyrm', level: player.level, xp: player.xp });
+                    savePlayerToDb(player);
+                  }
+                }
+              }
+            }, freezeDelay);
+          }
+          
+          // Also do cone breath as secondary attack
+          if (nearestPlayer) {
+            const dir = normalize({ x: nearestPlayer.x - enemy.x, y: nearestPlayer.y - enemy.y });
+            const coneRange = 280;
+            const baseAngle = Math.atan2(dir.y, dir.x);
+            for (const player of alivePlayers) {
+              const toPlayer = { x: player.x - enemy.x, y: player.y - enemy.y };
+              const playerDist = Math.sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+              if (playerDist < coneRange) {
+                const playerAngle = Math.atan2(toPlayer.y, toPlayer.x);
+                let angleDiff = Math.abs(playerAngle - baseAngle);
+                if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                if (angleDiff < Math.PI / 4 && !player.invincible) {
+                  player.health -= 25;
+                  player.frozenUntil = Math.max(player.frozenUntil || 0, now + 1500);
+                  io.to(player.socketId).emit('damaged', { amount: 25, fromX: enemy.x, fromY: enemy.y });
+                  if (player.health <= 0) { player.health = 0; player.deaths = (player.deaths || 0) + 1; io.to(player.socketId).emit('died', { killedBy: 'Frost Wyrm' }); savePlayerToDb(player); }
                 }
               }
             }
           }
-          io.emit('iceNova', { x: enemy.x, y: enemy.y, radius: coneRange });
+          io.emit('iceNova', { x: enemy.x, y: enemy.y, radius: 280 });
           io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
         }
         
         else if (attackType === 'void_pulse') {
-          // Void Overlord: Pull players in, then explode
-          const pullRadius = 300;
-          const explodeRadius = 150;
+          // Void Overlord: Stronger pull + explode
+          const pullRadius = 400;
+          const explodeRadius = 180;
           
-          // Warning
           io.emit('meteorWarning', { x: enemy.x, y: enemy.y, radius: explodeRadius, delay: 2000 });
           
-          // Pull effect
+          // Stronger pull effect
           const pullInterval = setInterval(() => {
             for (const player of gameState.players.values()) {
               if (player.health <= 0) continue;
               const dist = distance(enemy, player);
               if (dist < pullRadius && dist > 30) {
                 const pullDir = normalize({ x: enemy.x - player.x, y: enemy.y - player.y });
-                player.x += pullDir.x * 3;
-                player.y += pullDir.y * 3;
+                const pullStrength = 5 * (1 - dist / pullRadius); // Stronger when closer
+                player.x += pullDir.x * pullStrength;
+                player.y += pullDir.y * pullStrength;
               }
             }
           }, 50);
           
-          // Explode after delay
           setTimeout(() => {
             clearInterval(pullInterval);
             for (const player of gameState.players.values()) {
               if (player.health <= 0) continue;
-              if (player.invincible) continue; // Admin invincibility
+              if (player.invincible) continue;
               if (distance(enemy, player) < explodeRadius) {
-                player.health -= 60;
-                io.to(player.socketId).emit('damaged', { amount: 60, fromX: enemy.x, fromY: enemy.y });
+                player.health -= 70;
+                io.to(player.socketId).emit('damaged', { amount: 70, fromX: enemy.x, fromY: enemy.y });
                 if (player.health <= 0) {
                   player.health = 0;
                   player.deaths = (player.deaths || 0) + 1;
@@ -786,6 +867,44 @@ export function gameTick() {
           
           io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
           spawnParticles(enemy.x, enemy.y, '#7c3aed', 15);
+        }
+        
+        else if (attackType === 'crystal_barrage') {
+          // Crystal Golem: Shoot crystal shards in all directions
+          // At 1/3 HP, enlarge (handled separately)
+          const healthPct = enemy.health / (ENEMY_TYPES[enemy.type]?.health || enemy.health);
+          if (healthPct < 0.33 && !enemy.enlarged) {
+            enemy.enlarged = true;
+            enemy.radius = Math.floor((enemy.radius || 40) * 1.6);
+            enemy.damage = Math.floor((enemy.damage || 20) * 1.4);
+            enemy.speed = Math.floor((enemy.speed || 30) * 1.3);
+            io.emit('bossEnlarge', { enemyId: enemy.id, radius: enemy.radius });
+            spawnParticles(enemy.x, enemy.y, '#ec4899', 20);
+          }
+          
+          const numShards = enemy.enlarged ? 10 : 6;
+          for (let i = 0; i < numShards; i++) {
+            const angle = (i / numShards) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
+            const id = 'crystal_' + Math.random().toString(36).substr(2, 9);
+            gameState.projectiles.set(id, {
+              id,
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(angle) * 160,
+              vy: Math.sin(angle) * 160,
+              damage: enemy.enlarged ? 30 : 22,
+              radius: 10,
+              color: '#ec4899',
+              trailColor: '#f0abfc',
+              fromEnemy: true,
+              maxRange: 400,
+              traveled: 0,
+              createdAt: now,
+              canHitPlayers: true,
+            });
+          }
+          io.emit('sound', { type: 'bossAttack', x: enemy.x, y: enemy.y });
+          spawnParticles(enemy.x, enemy.y, '#ec4899', 10);
         }
       }
     }

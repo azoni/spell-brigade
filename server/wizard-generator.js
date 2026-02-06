@@ -12,6 +12,13 @@ IMPORTANT: Pay close attention to the user's description. If they specify spell 
 elemental themes, or gameplay mechanics, incorporate those directly into the generated class. Honor their creative 
 vision while keeping the stats balanced within the ranges below.
 
+CLASS NAMING RULES (VERY IMPORTANT):
+- NEVER use the word "Wizard" in the class name. Use creative alternatives like: Sage, Mage, Weaver, Channeler,
+  Invoker, Warlock, Sorcerer, Shaman, Hierophant, Tempest, Harbinger, Oracle, Adept, Mystic, Enchanter, 
+  Conjurer, Thaumaturge, Elementalist, Warden, Herald, or completely unique thematic titles.
+- Class names should be evocative and specific: "Stormcaller" not "Storm Wizard", "Plagueweaver" not "Poison Wizard"
+- 1-2 words preferred, 3 max. Single compound words are great: "Frostweaver", "Shadowmancer", "Voidcaller"
+
 EXISTING CLASSES FOR REFERENCE (to keep balance similar):
 - Pyromancer: HP 80, Speed 180, Spell1: 28dmg/900ms/projectile, Spell2: 18dmg/1500ms/AOE
 - Cryomancer: HP 90, Speed 170, Spell1: 18dmg/500ms/projectile+slow, Spell2: 12dmg/2500ms/AOE+slow  
@@ -19,15 +26,15 @@ EXISTING CLASSES FOR REFERENCE (to keep balance similar):
 
 Respond with ONLY this JSON:
 {
-  "name": "Class name (2-3 words max)",
-  "description": "One sentence class description",
+  "name": "Class name (1-2 words, NO 'Wizard' in name)",
+  "description": "One vivid sentence class description",
   "color": "#hex primary color",
   "secondaryColor": "#hex accent color",
   "baseHealth": 80-110,
   "baseSpeed": 165-195,
-  "lore": "2-3 sentence backstory for this wizard type",
+  "lore": "2-3 sentence backstory for this wizard type. Be creative and specific.",
   "spell1": {
-    "name": "Spell name",
+    "name": "Spell name (creative, thematic - not just 'Element Bolt')",
     "type": "projectile or aoe",
     "damage": 15-45,
     "cooldown": 400-2500,
@@ -36,11 +43,11 @@ Respond with ONLY this JSON:
     "speed": 350-700 for projectile or 0 for aoe,
     "color": "#hex",
     "trailColor": "#hex (projectile only)",
-    "description": "Brief spell description",
+    "description": "Detailed spell description with visual flavor",
     "specialEffect": "none|slow|piercing|homing"
   },
   "spell2": {
-    "name": "Spell name", 
+    "name": "Spell name (creative, thematic)", 
     "type": "projectile or aoe",
     "damage": 10-50,
     "cooldown": 800-3000,
@@ -49,7 +56,7 @@ Respond with ONLY this JSON:
     "speed": 350-700 for projectile or 0 for aoe,
     "color": "#hex",
     "trailColor": "#hex (projectile only)",
-    "description": "Brief spell description",
+    "description": "Detailed spell description with visual flavor",
     "specialEffect": "none|slow|piercing|homing"
   },
   "ability1": {
@@ -59,7 +66,7 @@ Respond with ONLY this JSON:
     "cooldown": 8000-15000,
     "radius": 80-200,
     "duration": 3000-6000,
-    "description": "Brief ability description"
+    "description": "Detailed ability description"
   },
   "ability2": {
     "name": "Ability name (unlocks at Lv20)",
@@ -68,7 +75,7 @@ Respond with ONLY this JSON:
     "cooldown": 12000-20000,
     "radius": 100-250,
     "duration": 2000-5000,
-    "description": "Brief ability description"
+    "description": "Detailed ability description"
   },
   "ability3": {
     "name": "Ability name (unlocks at Lv30, powerful ultimate-type)",
@@ -77,20 +84,20 @@ Respond with ONLY this JSON:
     "cooldown": 20000-35000,
     "radius": 150-300,
     "duration": 3000-8000,
-    "description": "Brief ability description"
+    "description": "Detailed ability description"
   },
   "dashAbility": {
-    "name": "Dash name",
+    "name": "Dash name (thematic)",
     "cooldown": 3000-7000,
     "distance": 150-280,
     "description": "Brief dash description"
   },
   "ultimateAbility": {
-    "name": "Ultimate name",
+    "name": "Ultimate name (epic, dramatic)",
     "cooldown": 15000-30000,
     "damage": 40-120,
     "radius": 120-220,
-    "description": "Brief ultimate description"
+    "description": "Detailed ultimate description"
   }
 }
 
@@ -100,7 +107,9 @@ BALANCE RULES:
 - Total DPS should be comparable to existing classes (~25-35 DPS sustained)
 - Ability1 is a moderate skill, Ability2 is stronger, Ability3 is the most powerful
 - Be creative with themes but keep stats within the given ranges
-- Colors should match the wizard's element/theme`;
+- Colors should match the wizard's element/theme
+- Make each spell feel unique - vary between projectile types (straight, homing, piercing) and AOE styles
+- Avoid generic descriptions like "shoots a bolt" - add flavor and personality`;
 
 // Stat clamping ranges
 const CLAMP = {
@@ -366,13 +375,14 @@ function generateFromTemplate(prompt) {
   // Add some randomization to stats
   const variance = () => 0.95 + Math.random() * 0.15; // 95%-110%
   
-  // Try to extract a custom name from the prompt
-  const words = prompt.trim().split(/\s+/).filter(w => w.length >= 3);
+  // Try to extract a custom name from the prompt, avoiding "Wizard"
+  const words = prompt.trim().split(/\s+/).filter(w => w.length >= 3 && w.toLowerCase() !== 'wizard' && w.toLowerCase() !== 'make' && w.toLowerCase() !== 'create');
   let customName = bestTemplate.name;
-  if (words.length >= 2) {
-    // Capitalize first 2-3 meaningful words
+  if (words.length >= 1 && words.length <= 3) {
     const nameWords = words.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-    customName = nameWords.join(' ').slice(0, 30);
+    const candidate = nameWords.join(' ').slice(0, 30);
+    // Only use if it's meaningfully different from template
+    if (candidate.length > 3) customName = candidate;
   }
   
   const data = {
