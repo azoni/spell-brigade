@@ -1,493 +1,440 @@
 // ===========================================
-// SPELL SYSTEM - Upgrades, Effects, Boss Drops
+// SPELLS
 // ===========================================
 
-// Base spell definitions by class
-const BASE_SPELLS = {
-  pyromancer: {
-    primary: {
-      id: 'fireball',
-      name: 'Fireball',
-      description: 'Hurls a ball of fire at enemies',
-      baseDamage: 25,
-      cooldown: 800,
-      speed: 8,
-      range: 400,
-      color: '#f97316',
-      type: 'projectile',
-    },
-    secondary: {
-      id: 'flame_wave',
-      name: 'Flame Wave',
-      description: 'Releases a wave of fire in front of you',
-      baseDamage: 15,
-      cooldown: 2000,
-      range: 200,
-      angle: Math.PI / 3,
-      color: '#dc2626',
-      type: 'wave',
-    },
-    ultimate: {
-      id: 'meteor',
-      name: 'Meteor Strike',
-      description: 'Calls down a devastating meteor',
-      baseDamage: 100,
-      cooldown: 15000,
-      radius: 150,
-      color: '#f97316',
-      type: 'aoe',
-    },
+export const SPELLS = {
+  fireball: {
+    id: 'fireball',
+    name: 'Fireball',
+    damage: 28,
+    cooldown: 900,
+    range: 320,
+    speed: 450,
+    radius: 12,
+    color: '#ff6b35',
+    trailColor: '#ffaa00',
   },
-  cryomancer: {
-    primary: {
-      id: 'frostbolt',
-      name: 'Frostbolt',
-      description: 'Launches a shard of ice',
-      baseDamage: 20,
-      cooldown: 700,
-      speed: 10,
-      range: 450,
-      slowAmount: 0.3,
-      slowDuration: 1500,
-      color: '#22d3ee',
-      type: 'projectile',
-    },
-    secondary: {
-      id: 'blizzard',
-      name: 'Blizzard',
-      description: 'Creates a localized blizzard',
-      baseDamage: 8,
-      cooldown: 3000,
-      radius: 120,
-      duration: 3000,
-      color: '#0ea5e9',
-      type: 'zone',
-    },
-    ultimate: {
-      id: 'ice_nova',
-      name: 'Ice Nova',
-      description: 'Explodes outward with freezing energy',
-      baseDamage: 60,
-      cooldown: 12000,
-      radius: 200,
-      freezeDuration: 2000,
-      color: '#67e8f9',
-      type: 'nova',
-    },
+  flamewave: {
+    id: 'flamewave',
+    name: 'Flame Wave',
+    damage: 18,
+    cooldown: 1500,
+    range: 200,
+    speed: 0, // AOE
+    radius: 120,
+    color: '#ff4500',
+    isAoe: true,
   },
-  arcanist: {
-    primary: {
-      id: 'arcane_missile',
-      name: 'Arcane Missile',
-      description: 'Fires a bolt of pure arcane energy',
-      baseDamage: 22,
-      cooldown: 600,
-      speed: 12,
-      range: 500,
-      color: '#a855f7',
-      type: 'projectile',
-    },
-    secondary: {
-      id: 'arcane_burst',
-      name: 'Arcane Burst',
-      description: 'Releases burst of arcane energy',
-      baseDamage: 30,
-      cooldown: 2500,
-      radius: 100,
-      color: '#7c3aed',
-      type: 'burst',
-    },
-    ultimate: {
-      id: 'arcane_storm',
-      name: 'Arcane Storm',
-      description: 'Conjures a storm of arcane bolts',
-      baseDamage: 40,
-      cooldown: 14000,
-      duration: 4000,
-      boltsPerSecond: 3,
-      color: '#c084fc',
-      type: 'storm',
-    },
+  frostbolt: {
+    id: 'frostbolt',
+    name: 'Frost Bolt',
+    damage: 18,
+    cooldown: 500,
+    range: 280,
+    speed: 550,
+    radius: 8,
+    color: '#4ecdc4',
+    trailColor: '#a0e9e4',
+    slowEffect: 0.5, // 50% slow
+    slowDuration: 1500,
   },
-};
+  blizzard: {
+    id: 'blizzard',
+    name: 'Blizzard',
+    damage: 12,
+    cooldown: 2500,
+    range: 250,
+    speed: 0,
+    radius: 150,
+    color: '#87ceeb',
+    isAoe: true,
+    slowEffect: 0.3,
+    slowDuration: 2000,
+  },
+  arcaneBlast: {
+    id: 'arcaneBlast',
+    name: 'Arcane Blast',
+    damage: 45,
+    cooldown: 2000,
+    range: 180,
+    speed: 0,
+    radius: 100,
+    color: '#9b5de5',
+    isAoe: true,
+  },
+  magicMissile: {
+    id: 'magicMissile',
+    name: 'Magic Missile',
+    damage: 15,
+    cooldown: 400,
+    range: 350,
+    speed: 600,
+    radius: 6,
+    color: '#e056fd',
+    trailColor: '#d63384',
+    homing: true,
+  },
+  
+  // === VOIDLORD SPELLS ===
+  voidBolt: {
+    id: 'voidBolt',
+    name: 'Void Bolt',
+    damage: 30,
+    cooldown: 700,
+    range: 350,
+    speed: 500,
+    radius: 12,
+    color: '#1a0a2e',
+    trailColor: '#ff00ff',
+    piercing: true,
+    isVoidBolt: true,
+  },
+  annihilate: {
+    id: 'annihilate',
+    name: 'Annihilate',
+    damage: 45,
+    cooldown: 2500,
+    range: 300,
+    speed: 0, // AOE
+    radius: 120,
+    color: '#ff00ff',
+    isAoe: true,
+  },
+  
+  // === SHADOW ARCHER SPELLS ===
+  shadowArrow: {
+    id: 'shadowArrow',
+    name: 'Shadow Arrow',
+    damage: 55,
+    cooldown: 350,
+    range: 550,
+    speed: 900,
+    radius: 8,
+    color: '#0f172a',
+    trailColor: '#dc2626',
+    piercing: true,
+    canHitPlayers: true,
+    isArrow: true,
+  },
+  piercingVolley: {
+    id: 'piercingVolley',
+    name: 'Piercing Volley',
+    damage: 80,
+    cooldown: 1500,
+    range: 450,
+    speed: 0,
+    radius: 180,
+    color: '#dc2626',
+    isAoe: true,
+    canHitPlayers: true,
+  },
+  
+  // === PYROMANCER CLASS ABILITIES ===
+  flameShield: {
+    id: 'flameShield',
+    name: 'Flame Shield',
+    damage: 15,
+    cooldown: 12000,
+    range: 0,
+    speed: 0,
+    radius: 80,
+    color: '#ff6b35',
+    isAoe: true,
+    duration: 5000,
+    class: 'pyromancer',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Surround yourself with flames, damaging nearby enemies',
+  },
+  meteorStrike: {
+    id: 'meteorStrike',
+    name: 'Meteor Strike',
+    damage: 80,
+    cooldown: 18000,
+    range: 350,
+    speed: 0,
+    radius: 100,
+    color: '#ff4500',
+    isAoe: true,
+    delay: 1500,
+    class: 'pyromancer',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Call down a devastating meteor from the sky',
+  },
+  inferno: {
+    id: 'inferno',
+    name: 'Inferno',
+    damage: 150,
+    cooldown: 45000,
+    range: 0,
+    speed: 0,
+    radius: 250,
+    color: '#ff0000',
+    isAoe: true,
+    class: 'pyromancer',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Unleash a massive explosion of fire around you',
+  },
 
-// Spell upgrades that can drop from bosses
-const SPELL_UPGRADES = {
-  // Pyromancer upgrades
-  inferno_core: {
-    id: 'inferno_core',
-    name: 'Inferno Core',
-    description: 'Fireballs explode on impact, dealing area damage',
-    class: 'pyromancer',
-    spell: 'fireball',
-    rarity: 'rare',
-    dropRate: 0.15,
-    effect: {
-      type: 'explosion',
-      radius: 60,
-      damageMultiplier: 0.5,
-    },
-    visualEffect: 'explosion_trail',
-  },
-  blazing_speed: {
-    id: 'blazing_speed',
-    name: 'Blazing Speed',
-    description: 'Fireballs travel 50% faster and pierce one enemy',
-    class: 'pyromancer',
-    spell: 'fireball',
-    rarity: 'uncommon',
-    dropRate: 0.2,
-    effect: {
-      type: 'pierce',
-      count: 1,
-      speedBonus: 0.5,
-    },
-    visualEffect: 'flame_trail',
-  },
-  phoenix_flame: {
-    id: 'phoenix_flame',
-    name: 'Phoenix Flame',
-    description: 'Meteors leave burning ground that damages over time',
-    class: 'pyromancer',
-    spell: 'meteor',
-    rarity: 'epic',
-    dropRate: 0.08,
-    effect: {
-      type: 'dot_zone',
-      duration: 5000,
-      tickDamage: 10,
-      tickRate: 500,
-    },
-    visualEffect: 'burning_ground',
-  },
-  
-  // Cryomancer upgrades
-  permafrost: {
-    id: 'permafrost',
-    name: 'Permafrost',
-    description: 'Enemies hit by Frostbolt have a 20% chance to freeze solid',
+  // === CRYOMANCER CLASS ABILITIES ===
+  frostNova: {
+    id: 'frostNova',
+    name: 'Frost Nova',
+    damage: 25,
+    cooldown: 10000,
+    range: 0,
+    speed: 0,
+    radius: 120,
+    color: '#00ffff',
+    isAoe: true,
+    freezeDuration: 3000,
     class: 'cryomancer',
-    spell: 'frostbolt',
-    rarity: 'rare',
-    dropRate: 0.15,
-    effect: {
-      type: 'freeze_chance',
-      chance: 0.2,
-      duration: 1500,
-    },
-    visualEffect: 'ice_encasement',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Freeze all nearby enemies in place',
   },
-  glacial_shards: {
-    id: 'glacial_shards',
-    name: 'Glacial Shards',
-    description: 'Frostbolts split into 3 smaller shards on impact',
-    class: 'cryomancer',
-    spell: 'frostbolt',
-    rarity: 'epic',
-    dropRate: 0.1,
-    effect: {
-      type: 'split',
-      count: 3,
-      damageMultiplier: 0.4,
-      spreadAngle: Math.PI / 4,
-    },
-    visualEffect: 'crystal_split',
-  },
-  absolute_zero: {
-    id: 'absolute_zero',
-    name: 'Absolute Zero',
-    description: 'Ice Nova freezes enemies for twice as long and shatters frozen enemies',
-    class: 'cryomancer',
-    spell: 'ice_nova',
-    rarity: 'legendary',
-    dropRate: 0.05,
-    effect: {
-      type: 'enhanced_freeze',
-      durationMultiplier: 2,
-      shatterDamage: 50,
-    },
-    visualEffect: 'shatter_effect',
-  },
-  
-  // Arcanist upgrades
-  mana_surge: {
-    id: 'mana_surge',
-    name: 'Mana Surge',
-    description: 'Every 5th Arcane Missile deals triple damage',
-    class: 'arcanist',
-    spell: 'arcane_missile',
-    rarity: 'uncommon',
-    dropRate: 0.2,
-    effect: {
-      type: 'empowered_nth',
-      n: 5,
-      damageMultiplier: 3,
-    },
-    visualEffect: 'charged_missile',
-  },
-  void_touched: {
-    id: 'void_touched',
-    name: 'Void Touched',
-    description: 'Arcane Missiles home in on enemies and ignore obstacles',
-    class: 'arcanist',
-    spell: 'arcane_missile',
-    rarity: 'rare',
-    dropRate: 0.12,
-    effect: {
-      type: 'homing',
-      turnRate: 0.1,
-      phaseThrough: true,
-    },
-    visualEffect: 'void_trail',
-  },
-  reality_tear: {
-    id: 'reality_tear',
-    name: 'Reality Tear',
-    description: 'Arcane Storm creates a black hole that pulls enemies inward',
-    class: 'arcanist',
-    spell: 'arcane_storm',
-    rarity: 'legendary',
-    dropRate: 0.05,
-    effect: {
-      type: 'vortex',
-      pullStrength: 50,
-      radius: 200,
-    },
-    visualEffect: 'black_hole',
-  },
-};
-
-// New alternate spells unlocked from bosses
-const ALTERNATE_SPELLS = {
-  // Pyromancer alternates
-  dragons_breath: {
-    id: 'dragons_breath',
-    name: "Dragon's Breath",
-    description: 'Breathe a continuous stream of fire',
-    class: 'pyromancer',
-    replacesSlot: 'primary',
-    rarity: 'epic',
-    dropRate: 0.08,
-    stats: {
-      damagePerTick: 8,
-      tickRate: 100,
-      range: 250,
-      coneAngle: Math.PI / 6,
-      manaCost: 2,
-    },
-    visualEffect: 'flame_breath',
-  },
-  living_bomb: {
-    id: 'living_bomb',
-    name: 'Living Bomb',
-    description: 'Mark an enemy to explode after 3 seconds, damaging nearby foes',
-    class: 'pyromancer',
-    replacesSlot: 'secondary',
-    rarity: 'rare',
-    dropRate: 0.12,
-    stats: {
-      markDuration: 3000,
-      explosionDamage: 80,
-      explosionRadius: 120,
-      cooldown: 5000,
-    },
-    visualEffect: 'bomb_mark',
-  },
-  
-  // Cryomancer alternates
-  ice_lance: {
-    id: 'ice_lance',
+  iceLance: {
+    id: 'iceLance',
     name: 'Ice Lance',
-    description: 'Pierce through all enemies in a line, dealing bonus damage to frozen targets',
+    damage: 60,
+    cooldown: 15000,
+    range: 500,
+    speed: 700,
+    radius: 10,
+    color: '#00ccff',
+    trailColor: '#87ceeb',
+    piercing: true,
+    slowEffect: 0.8,
+    slowDuration: 4000,
     class: 'cryomancer',
-    replacesSlot: 'primary',
-    rarity: 'epic',
-    dropRate: 0.08,
-    stats: {
-      baseDamage: 30,
-      frozenBonusDamage: 50,
-      pierceAll: true,
-      cooldown: 1200,
-      range: 600,
-    },
-    visualEffect: 'ice_pierce',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Pierce through enemies with a massive ice shard',
   },
-  frost_armor: {
-    id: 'frost_armor',
-    name: 'Frost Armor',
-    description: 'Encase yourself in ice, reducing damage and freezing attackers',
+  glacialStorm: {
+    id: 'glacialStorm',
+    name: 'Glacial Storm',
+    damage: 40,
+    cooldown: 40000,
+    range: 300,
+    speed: 0,
+    radius: 200,
+    color: '#b3e5fc',
+    isAoe: true,
+    duration: 6000,
+    freezeDuration: 2000,
     class: 'cryomancer',
-    replacesSlot: 'secondary',
-    rarity: 'rare',
-    dropRate: 0.12,
-    stats: {
-      duration: 4000,
-      damageReduction: 0.5,
-      reflectFreezeDuration: 1000,
-      cooldown: 10000,
-    },
-    visualEffect: 'ice_shield',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Summon a devastating blizzard that freezes all enemies',
   },
-  
-  // Arcanist alternates
-  arcane_orb: {
-    id: 'arcane_orb',
-    name: 'Arcane Orb',
-    description: 'Launch a slow-moving orb that deals massive damage',
-    class: 'arcanist',
-    replacesSlot: 'primary',
-    rarity: 'epic',
-    dropRate: 0.08,
-    stats: {
-      baseDamage: 60,
-      speed: 3,
-      radius: 40,
-      cooldown: 1500,
-      growthRate: 0.5, // Grows larger over distance
-    },
-    visualEffect: 'growing_orb',
-  },
+
+  // === ARCANIST CLASS ABILITIES ===
   blink: {
     id: 'blink',
     name: 'Blink',
-    description: 'Instantly teleport a short distance, leaving arcane afterimages',
+    damage: 0,
+    cooldown: 8000,
+    range: 200,
+    speed: 0,
+    radius: 0,
+    color: '#9b5de5',
+    isTeleport: true,
     class: 'arcanist',
-    replacesSlot: 'secondary',
-    rarity: 'rare',
-    dropRate: 0.12,
-    stats: {
-      maxDistance: 200,
-      cooldown: 3000,
-      afterimages: 3,
-      afterimageDamage: 15,
-    },
-    visualEffect: 'blink_trail',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Instantly teleport a short distance',
+  },
+  arcaneBarrage: {
+    id: 'arcaneBarrage',
+    name: 'Arcane Barrage',
+    damage: 30,
+    cooldown: 14000,
+    range: 400,
+    speed: 500,
+    radius: 8,
+    color: '#e056fd',
+    trailColor: '#9b5de5',
+    homing: true,
+    projectileCount: 5,
+    class: 'arcanist',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Launch multiple homing arcane missiles',
+  },
+  timeWarp: {
+    id: 'timeWarp',
+    name: 'Time Warp',
+    damage: 0,
+    cooldown: 60000,
+    range: 0,
+    speed: 0,
+    radius: 0,
+    color: '#d4af37',
+    duration: 8000,
+    speedBoost: 1.5,
+    cooldownReduction: 0.5,
+    class: 'arcanist',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Warp time - gain massive speed and cooldown reduction',
+  },
+
+  // === STORMCALLER CLASS ABILITIES ===
+  staticField: {
+    id: 'staticField',
+    name: 'Static Field',
+    damage: 20,
+    cooldown: 9000,
+    range: 0,
+    speed: 0,
+    radius: 100,
+    color: '#ffff00',
+    isAoe: true,
+    stunDuration: 1000,
+    class: 'stormcaller',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Shock nearby enemies with electricity',
+  },
+  ballLightning: {
+    id: 'ballLightning',
+    name: 'Ball Lightning',
+    damage: 100,
+    cooldown: 16000,
+    range: 500,
+    speed: 150,
+    radius: 30,
+    color: '#ffd700',
+    trailColor: '#ffff00',
+    piercing: true,
+    chainLightning: true,
+    class: 'stormcaller',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Send a slow but devastating ball of lightning',
+  },
+  thunderGod: {
+    id: 'thunderGod',
+    name: 'Thunder God',
+    damage: 200,
+    cooldown: 50000,
+    range: 0,
+    speed: 0,
+    radius: 350,
+    color: '#ffffff',
+    isAoe: true,
+    chainCount: 8,
+    class: 'stormcaller',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Call upon the fury of storms to devastate all enemies',
+  },
+
+  // === VOIDLORD CLASS ABILITIES ===
+  voidRiftAbility: {
+    id: 'voidRiftAbility',
+    name: 'Void Rift',
+    damage: 30,
+    cooldown: 10000,
+    range: 250,
+    speed: 0,
+    radius: 100,
+    color: '#8b00ff',
+    isAoe: true,
+    duration: 3000,
+    class: 'voidlord',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Tear open a rift to the void that damages enemies',
+  },
+  soulDrain: {
+    id: 'soulDrain',
+    name: 'Soul Drain',
+    damage: 40,
+    cooldown: 14000,
+    range: 350,
+    speed: 400,
+    radius: 12,
+    color: '#ff00ff',
+    trailColor: '#8b008b',
+    homing: true,
+    lifesteal: 0.3,
+    class: 'voidlord',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Launch a soul-seeking projectile that heals you',
+  },
+  apocalypse: {
+    id: 'apocalypse',
+    name: 'Apocalypse',
+    damage: 120,
+    cooldown: 45000,
+    range: 0,
+    speed: 0,
+    radius: 250,
+    color: '#1a0a2e',
+    isAoe: true,
+    class: 'voidlord',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'Unleash the void to annihilate everything nearby',
+  },
+  
+  // === SHADOW ARCHER CLASS ABILITIES ===
+  huntersMark: {
+    id: 'huntersMark',
+    name: "Hunter's Mark",
+    damage: 30,
+    cooldown: 6000,
+    range: 500,
+    speed: 1200,
+    radius: 8,
+    color: '#dc2626',
+    trailColor: '#991b1b',
+    isArrow: true,
+    piercing: true,
+    canHitPlayers: true,
+    class: 'shadowarcher',
+    levelRequired: 10,
+    hotkey: 1,
+    description: 'Mark a target - next attacks deal bonus damage',
+  },
+  multishot: {
+    id: 'multishot',
+    name: 'Multishot',
+    damage: 40,
+    cooldown: 10000,
+    range: 0,
+    speed: 0,
+    radius: 250,
+    color: '#dc2626',
+    isAoe: true,
+    canHitPlayers: true,
+    class: 'shadowarcher',
+    levelRequired: 20,
+    hotkey: 2,
+    description: 'Fire arrows in all directions',
+  },
+  deathArrow: {
+    id: 'deathArrow',
+    name: 'Death Arrow',
+    damage: 300,
+    cooldown: 30000,
+    range: 700,
+    speed: 1500,
+    radius: 12,
+    color: '#000',
+    trailColor: '#dc2626',
+    isArrow: true,
+    piercing: true,
+    canHitPlayers: true,
+    class: 'shadowarcher',
+    levelRequired: 30,
+    hotkey: 3,
+    description: 'A devastating arrow that obliterates its target',
   },
 };
 
-// Boss drop tables
-const BOSS_DROP_TABLES = {
-  ancient_treant: {
-    guaranteedXp: 500,
-    drops: [
-      { item: 'permafrost', chance: 0.15 },
-      { item: 'blazing_speed', chance: 0.15 },
-      { item: 'mana_surge', chance: 0.15 },
-      { item: 'frost_armor', chance: 0.08 },
-    ],
-  },
-  magma_titan: {
-    guaranteedXp: 750,
-    drops: [
-      { item: 'inferno_core', chance: 0.15 },
-      { item: 'phoenix_flame', chance: 0.08 },
-      { item: 'dragons_breath', chance: 0.06 },
-      { item: 'living_bomb', chance: 0.1 },
-    ],
-  },
-  frost_wyrm: {
-    guaranteedXp: 1000,
-    drops: [
-      { item: 'permafrost', chance: 0.12 },
-      { item: 'glacial_shards', chance: 0.1 },
-      { item: 'absolute_zero', chance: 0.05 },
-      { item: 'ice_lance', chance: 0.06 },
-    ],
-  },
-  void_overlord: {
-    guaranteedXp: 1500,
-    drops: [
-      { item: 'void_touched', chance: 0.12 },
-      { item: 'reality_tear', chance: 0.05 },
-      { item: 'blink', chance: 0.08 },
-      { item: 'arcane_orb', chance: 0.06 },
-    ],
-  },
-  crystal_golem: {
-    guaranteedXp: 600,
-    drops: [
-      { item: 'glacial_shards', chance: 0.12 },
-      { item: 'mana_surge', chance: 0.15 },
-      { item: 'blazing_speed', chance: 0.12 },
-    ],
-  },
-  blossom_behemoth: {
-    guaranteedXp: 400,
-    drops: [
-      { item: 'blazing_speed', chance: 0.2 },
-      { item: 'mana_surge', chance: 0.2 },
-      { item: 'permafrost', chance: 0.15 },
-    ],
-  },
-};
-
-// Calculate boss drops for a player
-function calculateBossDrops(bossType, playerClass) {
-  const dropTable = BOSS_DROP_TABLES[bossType];
-  if (!dropTable) return { xp: 100, items: [] };
-  
-  const drops = {
-    xp: dropTable.guaranteedXp,
-    items: [],
-  };
-  
-  for (const drop of dropTable.drops) {
-    if (Math.random() < drop.chance) {
-      // Check if this upgrade is for the player's class
-      const upgrade = SPELL_UPGRADES[drop.item] || ALTERNATE_SPELLS[drop.item];
-      if (upgrade && upgrade.class === playerClass) {
-        drops.items.push({
-          id: drop.item,
-          ...upgrade,
-        });
-      }
-    }
-  }
-  
-  return drops;
-}
-
-// Apply spell upgrade effects
-function applyUpgradeToSpell(spell, upgrade) {
-  const enhanced = { ...spell };
-  
-  switch (upgrade.effect.type) {
-    case 'explosion':
-      enhanced.explosionRadius = upgrade.effect.radius;
-      enhanced.explosionDamage = spell.baseDamage * upgrade.effect.damageMultiplier;
-      break;
-    case 'pierce':
-      enhanced.pierceCount = upgrade.effect.count;
-      enhanced.speed *= (1 + upgrade.effect.speedBonus);
-      break;
-    case 'freeze_chance':
-      enhanced.freezeChance = upgrade.effect.chance;
-      enhanced.freezeDuration = upgrade.effect.duration;
-      break;
-    case 'split':
-      enhanced.splitCount = upgrade.effect.count;
-      enhanced.splitDamage = spell.baseDamage * upgrade.effect.damageMultiplier;
-      enhanced.splitAngle = upgrade.effect.spreadAngle;
-      break;
-    case 'homing':
-      enhanced.homing = true;
-      enhanced.homingTurnRate = upgrade.effect.turnRate;
-      enhanced.phaseThrough = upgrade.effect.phaseThrough;
-      break;
-    case 'empowered_nth':
-      enhanced.empowerEveryN = upgrade.effect.n;
-      enhanced.empowerMultiplier = upgrade.effect.damageMultiplier;
-      break;
-  }
-  
-  return enhanced;
-}
-
-module.exports = {
-  BASE_SPELLS,
-  SPELL_UPGRADES,
-  ALTERNATE_SPELLS,
-  BOSS_DROP_TABLES,
-  calculateBossDrops,
-  applyUpgradeToSpell,
-};
