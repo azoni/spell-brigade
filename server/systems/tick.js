@@ -22,6 +22,12 @@ import { savePlayerToDb, getUnlockedSkins } from '../db/index.js';
 
 const TICK_INTERVAL = 1000 / TICK_RATE;
 
+// Check if a dungeon enemy and player are in the same dungeon instance
+function isSameDungeon(enemy, player) {
+  if (!enemy.isDungeon) return true;
+  return (enemy.dungeonId || 'default') === (player.customDungeonId || 'default');
+}
+
 // io reference - set via init()
 let io = null;
 
@@ -178,6 +184,7 @@ export function gameTick() {
               x: spawnX, y: spawnY, spawnX, spawnY,
               zone: 'dungeon', targetId: null, slowedUntil: 0, lastAttack: 0,
               createdAt: Date.now(), inDungeon: true, isDungeon: true,
+              dungeonId: cfg.id,
               isMiniBoss: template.isMiniBoss || false,
               chargeSpeed: template.chargeSpeed, chargeDistance: template.chargeDistance,
               attackCooldown: template.attackCooldown, summonCount: template.summonCount,
@@ -258,6 +265,12 @@ export function gameTick() {
             createdAt: Date.now(),
             inDungeon: true,
             isDungeon: true,
+            dungeonId: 'default',
+            isMiniBoss: template.isMiniBoss || false,
+            chargeSpeed: template.chargeSpeed,
+            chargeDistance: template.chargeDistance,
+            attackCooldown: template.attackCooldown,
+            summonCount: template.summonCount,
           };
           gameState.enemies.set(enemy.id, enemy);
         }
@@ -390,6 +403,13 @@ export function gameTick() {
         continue; // Skip - different realm (dungeon vs world)
       }
       
+      // DUNGEON ID ISOLATION: Only target players in the SAME dungeon instance
+      if (enemyInDungeon && playerInDungeon) {
+        if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) {
+          continue; // Skip - different dungeon instance
+        }
+      }
+      
       // Get player's zone
       const playerZone = getZoneAtPosition(player.x, player.y);
       
@@ -451,6 +471,7 @@ export function gameTick() {
         // Damage players hit during charge
         for (const player of gameState.players.values()) {
           if (player.health <= 0 || player.invincible) continue;
+          if (!isSameDungeon(enemy, player)) continue;
           if (distance(enemy, player) < enemy.radius + 20) {
             player.health -= template?.damage || 60;
             spawnDamageNumber(player.x, player.y - 20, template?.damage || 60);
@@ -504,6 +525,8 @@ export function gameTick() {
             maxRange: 400,
             traveled: 0,
             fromEnemy: true,
+            inDungeon: true,
+            dungeonId: enemy.dungeonId || 'default',
             createdAt: now,
           };
           gameState.projectiles.set(proj.id, proj);
@@ -532,6 +555,7 @@ export function gameTick() {
                 y: summonY,
                 zone: 'dungeon',
                 isDungeon: true,
+                dungeonId: enemy.dungeonId || 'default',
                 slowedUntil: 0,
                 frozenUntil: 0,
               };
@@ -545,6 +569,7 @@ export function gameTick() {
           io.emit('lichDeathWave', { x: enemy.x, y: enemy.y, radius: 150 });
           for (const player of gameState.players.values()) {
             if (player.health <= 0 || player.invincible) continue;
+            if (!isSameDungeon(enemy, player)) continue;
             if (distance(enemy, player) < 150) {
               player.health -= 30;
               spawnDamageNumber(player.x, player.y - 20, 30);
@@ -762,7 +787,7 @@ export function gameTick() {
     }
     
     // ========== DRAGON BOSS ATTACKS ==========
-    if (enemy.type === 'boss_dragon' && nearestPlayer) {
+    if ((enemy.type === 'boss_dragon' || enemy.isCustomBoss) && nearestPlayer) {
       const distToPlayer = distance(enemy, nearestPlayer);
       const attackRange = enemy.attackRange || 600;
       const attackCooldown = 1500 - (enemy.phase || 1) * 200; // Faster in higher phases
@@ -801,6 +826,7 @@ export function gameTick() {
           setTimeout(() => {
             for (const player of gameState.players.values()) {
               if (player.health <= 0 || !player.inDungeon) continue;
+              if (!isSameDungeon(enemy, player)) continue;
               const toPlayer = { x: player.x - enemy.x, y: player.y - enemy.y };
               const playerDist = Math.sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
               
@@ -830,6 +856,7 @@ export function gameTick() {
           
           for (const player of gameState.players.values()) {
             if (player.health <= 0 || !player.inDungeon) continue;
+            if (!isSameDungeon(enemy, player)) continue;
             const dist = distance(enemy, player);
             if (dist < 400) {
               const pushDir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
@@ -845,6 +872,7 @@ export function gameTick() {
           
           for (const player of gameState.players.values()) {
             if (player.health <= 0 || !player.inDungeon) continue;
+            if (!isSameDungeon(enemy, player)) continue;
             if (player.invincible) continue; // Admin invincibility
             if (distance(enemy, player) < 250) {
               player.health -= 40 + (enemy.phase - 1) * 10;
@@ -880,6 +908,7 @@ export function gameTick() {
               y: minionY,
               zone: 'dungeon',
               isDungeon: true,
+              dungeonId: enemy.dungeonId || 'default',
               facing: 'up',
               animFrame: 0,
               slowedUntil: 0,
@@ -915,6 +944,7 @@ export function gameTick() {
               createdAt: now,
               canHitPlayers: true,
               isDragonFire: true,
+              dungeonId: enemy.dungeonId || 'default',
             };
             gameState.projectiles.set(proj.id, proj);
           }
@@ -1019,9 +1049,12 @@ export function gameTick() {
       }
 
       // Attack player on collision (only if in same zone and not in sanctuary)
-      const attackTargetZone = getZoneAtPosition(nearestPlayer.x, nearestPlayer.y);
+      // Dungeon enemies skip world zone checks - they use dungeonId isolation instead
+      const attackTargetZone = enemyInDungeon ? null : getZoneAtPosition(nearestPlayer.x, nearestPlayer.y);
       const targetInSanctuary = attackTargetZone?.id === 'sanctuary';
-      const canAttack = !targetInSanctuary && (!enemyZone || !attackTargetZone || attackTargetZone.id === enemyZone.id);
+      const canAttack = enemyInDungeon
+        ? true  // Dungeon enemies can always attack (targeting already filtered by dungeonId)
+        : (!targetInSanctuary && (!enemyZone || !attackTargetZone || attackTargetZone.id === enemyZone.id));
       
       const collisionDist = enemy.radius + 16; // player radius
       if (canAttack && nearestDist < collisionDist && now - enemy.lastAttack > 500) {
@@ -1095,6 +1128,7 @@ export function gameTick() {
         for (const target of gameState.players.values()) {
           if (target.id === proj.ownerId) continue; // Don't hit self
           if (target.health <= 0) continue;
+          if (proj.dungeonId && (target.customDungeonId || 'default') !== proj.dungeonId) continue;
           if (distance(proj, target) < proj.radius + 20) {
             target.health -= proj.damage;
             spawnDamageNumber(target.x, target.y - 20, proj.damage, true);
@@ -1145,6 +1179,34 @@ export function gameTick() {
     // Check collision with enemies
     let hit = false;
     const projInDungeon = proj.inDungeon || false;
+    
+    // Enemy-fired projectiles (e.g. Lich soul bolt) hit players, not enemies
+    if (proj.fromEnemy) {
+      for (const target of gameState.players.values()) {
+        if (target.health <= 0 || target.invincible) continue;
+        if ((target.inDungeon || false) !== projInDungeon) continue;
+        if (proj.dungeonId && (target.customDungeonId || 'default') !== proj.dungeonId) continue;
+        if ((!target.invulnerableUntil || target.invulnerableUntil < now)) {
+          if (distance(proj, target) < proj.radius + 16) {
+            target.health -= proj.damage;
+            spawnDamageNumber(target.x, target.y - 20, proj.damage);
+            io.to(target.socketId).emit('damaged', { amount: proj.damage, fromX: proj.x, fromY: proj.y });
+            if (target.health <= 0) {
+              target.health = 0;
+              target.deaths = (target.deaths || 0) + 1;
+              io.to(target.socketId).emit('died', { killedBy: 'Dark Magic' });
+              savePlayerToDb(target);
+            }
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (hit) {
+        gameState.projectiles.delete(proj.id);
+        continue;
+      }
+    }
     
     for (const enemy of gameState.enemies.values()) {
       if (enemy.health <= 0) continue;
@@ -1252,6 +1314,7 @@ export function gameTick() {
       for (const target of gameState.players.values()) {
         if (target.id === proj.ownerId) continue;
         if (target.health <= 0) continue;
+        if (proj.dungeonId && (target.customDungeonId || 'default') !== proj.dungeonId) continue;
         if (distance(proj, target) < proj.radius + 20) {
           target.health -= proj.damage;
           spawnDamageNumber(target.x, target.y - 20, proj.damage, true);
@@ -1486,6 +1549,10 @@ export function gameTick() {
         if (e.isDungeon && !playerInDungeon) return false;
         // Regular enemies not visible to dungeon players
         if (!e.isDungeon && playerInDungeon) return false;
+        // Within dungeons, only show enemies from the same dungeon instance
+        if (e.isDungeon && playerInDungeon) {
+          if ((e.dungeonId || 'default') !== (player.customDungeonId || 'default')) return false;
+        }
         return true;
       })
       .map(e => ({
@@ -1591,7 +1658,12 @@ export function gameTick() {
         .filter(p => {
           // Only show players in same realm (dungeon vs world)
           const pInDungeon = p.inDungeon || false;
-          return pInDungeon === playerInDungeon;
+          if (pInDungeon !== playerInDungeon) return false;
+          // Within dungeons, only show players in the same dungeon instance
+          if (playerInDungeon && pInDungeon) {
+            if ((p.customDungeonId || 'default') !== (player.customDungeonId || 'default')) return false;
+          }
+          return true;
         })
         .map(p => ({
         id: p.id, name: p.name, class: p.class,

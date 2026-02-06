@@ -428,7 +428,11 @@ function clampAbility(abilityData, slot, classId, color) {
 }
 
 function clampWizardOutput(data) {
-  const classId = `custom_${uuidv4().slice(0, 8)}`;
+  // Generate a readable classId from the wizard name instead of UUID
+  const wizardName = (typeof data.name === 'string' ? data.name : 'Custom Wizard').slice(0, 25);
+  const slug = wizardName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const shortId = uuidv4().slice(0, 4); // Short suffix for uniqueness
+  const classId = `custom_${slug}_${shortId}`;
   const color = isValidHex(data.color) ? data.color : '#9b5de5';
   const secondaryColor = isValidHex(data.secondaryColor) ? data.secondaryColor : color;
 
