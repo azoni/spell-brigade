@@ -846,48 +846,66 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Portal interaction
+  // Portal interaction (supports both sanctuary->zone and zone->sanctuary return portals)
   socket.on('usePortal', ({ portalId }) => {
-    const portal = PORTALS[portalId];
+    const isReturn = portalId.endsWith('_return');
+    const baseId = isReturn ? portalId.replace('_return', '') : portalId;
+    const portal = PORTALS[baseId];
     if (!portal) return;
     
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id && player.health > 0) {
-        // Check if player is near portal entrance
-        const distToPortal = distance(player, portal.from);
-        if (distToPortal > 60) {
-          socket.emit('portalError', { message: 'Too far from portal' });
-          break;
+        if (isReturn) {
+          // Return portal: check if near returnFrom, teleport to returnTo
+          if (!portal.returnFrom || !portal.returnTo) {
+            socket.emit('portalError', { message: 'No return portal here' });
+            break;
+          }
+          const distToReturn = distance(player, portal.returnFrom);
+          if (distToReturn > 80) {
+            socket.emit('portalError', { message: 'Too far from portal' });
+            break;
+          }
+          const oldX = player.x;
+          const oldY = player.y;
+          player.x = portal.returnTo.x;
+          player.y = portal.returnTo.y;
+          socket.emit('portalUsed', {
+            portalId,
+            fromX: oldX, fromY: oldY,
+            toX: portal.returnTo.x, toY: portal.returnTo.y,
+            toZone: 'sanctuary',
+            color: portal.color,
+          });
+          io.emit('sound', { type: 'portalEnter', x: oldX, y: oldY });
+          io.emit('sound', { type: 'portalExit', x: portal.returnTo.x, y: portal.returnTo.y });
+          console.log(`🌀 ${player.name} returned to sanctuary via ${baseId}`);
+        } else {
+          // Normal sanctuary->zone portal
+          const distToPortal = distance(player, portal.from);
+          if (distToPortal > 80) {
+            socket.emit('portalError', { message: 'Too far from portal' });
+            break;
+          }
+          if (player.level < portal.requiredLevel) {
+            socket.emit('portalError', { message: `Requires level ${portal.requiredLevel}` });
+            break;
+          }
+          const oldX = player.x;
+          const oldY = player.y;
+          player.x = portal.to.x;
+          player.y = portal.to.y;
+          socket.emit('portalUsed', {
+            portalId,
+            fromX: oldX, fromY: oldY,
+            toX: portal.to.x, toY: portal.to.y,
+            toZone: portal.toZone,
+            color: portal.color,
+          });
+          io.emit('sound', { type: 'portalEnter', x: oldX, y: oldY });
+          io.emit('sound', { type: 'portalExit', x: portal.to.x, y: portal.to.y });
+          console.log(`🌀 ${player.name} used portal ${portalId} to ${portal.toZone}`);
         }
-        
-        // Check level requirement
-        if (player.level < portal.requiredLevel) {
-          socket.emit('portalError', { message: `Requires level ${portal.requiredLevel}` });
-          break;
-        }
-        
-        // Teleport player
-        const oldX = player.x;
-        const oldY = player.y;
-        player.x = portal.to.x;
-        player.y = portal.to.y;
-        
-        // Notify client of teleport
-        socket.emit('portalUsed', {
-          portalId,
-          fromX: oldX,
-          fromY: oldY,
-          toX: portal.to.x,
-          toY: portal.to.y,
-          toZone: portal.toZone,
-          color: portal.color,
-        });
-        
-        // Sound effect for nearby players
-        io.emit('sound', { type: 'portalEnter', x: oldX, y: oldY });
-        io.emit('sound', { type: 'portalExit', x: portal.to.x, y: portal.to.y });
-        
-        console.log(`🌀 ${player.name} used portal ${portalId} to ${portal.toZone}`);
         break;
       }
     }
