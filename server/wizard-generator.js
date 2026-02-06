@@ -13,9 +13,9 @@ elemental themes, or gameplay mechanics, incorporate those directly into the gen
 vision while keeping the stats balanced within the ranges below.
 
 EXISTING CLASSES FOR REFERENCE (to keep balance similar):
-- Pyromancer: HP 80, Speed 160, Spell1: 28dmg/900ms/projectile, Spell2: 18dmg/1500ms/AOE
-- Cryomancer: HP 90, Speed 150, Spell1: 18dmg/500ms/projectile+slow, Spell2: 12dmg/2500ms/AOE+slow  
-- Arcanist: HP 100, Speed 140, Spell1: 45dmg/2000ms/AOE, Spell2: 15dmg/400ms/homing
+- Pyromancer: HP 80, Speed 180, Spell1: 28dmg/900ms/projectile, Spell2: 18dmg/1500ms/AOE
+- Cryomancer: HP 90, Speed 170, Spell1: 18dmg/500ms/projectile+slow, Spell2: 12dmg/2500ms/AOE+slow  
+- Arcanist: HP 100, Speed 160, Spell1: 45dmg/2000ms/AOE, Spell2: 15dmg/400ms/homing
 
 Respond with ONLY this JSON:
 {
@@ -24,7 +24,7 @@ Respond with ONLY this JSON:
   "color": "#hex primary color",
   "secondaryColor": "#hex accent color",
   "baseHealth": 80-110,
-  "baseSpeed": 135-165,
+  "baseSpeed": 165-195,
   "lore": "2-3 sentence backstory for this wizard type",
   "spell1": {
     "name": "Spell name",
@@ -105,9 +105,9 @@ BALANCE RULES:
 // Stat clamping ranges
 const CLAMP = {
   baseHealth: [80, 110],
-  baseSpeed: [135, 165],
+  baseSpeed: [175, 205],
   spell: {
-    damage: [8, 50],
+    damage: [15, 50],
     cooldown: [350, 3000],
     range: [150, 450],
     speed: [0, 800],
@@ -228,9 +228,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Pyroclasm', type: 'aoe', damage: 35, cooldown: 8000, radius: 120, duration: 2500 },
     ability2: { name: 'Molten Armor', type: 'buff', damage: 40, cooldown: 14000, radius: 150, duration: 4000 },
     ability3: { name: 'Firestorm', type: 'aoe', damage: 85, cooldown: 25000, radius: 220, duration: 5000 },
-    dash: { name: 'Flame Dash', cooldown: 4000, distance: 200 },
-    ult: { name: 'Phoenix Burst', cooldown: 22000, damage: 90, radius: 180 },
-    baseHealth: 85, baseSpeed: 158,
+    dash: { name: 'Flame Dash', description: 'Dash forward in a burst of fire.', cooldown: 4000, distance: 200 },
+    ult: { name: 'Phoenix Burst', description: 'Erupt in a phoenix-shaped explosion of flame.', cooldown: 22000, damage: 90, radius: 180 },
+    baseHealth: 85, baseSpeed: 188,
   },
   {
     keywords: ['ice', 'frost', 'cold', 'freeze', 'snow', 'blizzard', 'cryo', 'winter', 'glacier', 'chill'],
@@ -242,9 +242,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Frozen Spike', type: 'projectile', damage: 30, cooldown: 7000, radius: 100, duration: 2000 },
     ability2: { name: 'Permafrost', type: 'aoe', damage: 35, cooldown: 13000, radius: 160, duration: 3500 },
     ability3: { name: 'Absolute Zero', type: 'aoe', damage: 70, cooldown: 24000, radius: 200, duration: 6000 },
-    dash: { name: 'Ice Slide', cooldown: 3500, distance: 220 },
-    ult: { name: 'Blizzard Wrath', cooldown: 20000, damage: 75, radius: 200 },
-    baseHealth: 92, baseSpeed: 148,
+    dash: { name: 'Ice Slide', description: 'Glide on ice, leaving a frozen trail.', cooldown: 3500, distance: 220 },
+    ult: { name: 'Blizzard Wrath', description: 'Summon a devastating blizzard in the area.', cooldown: 20000, damage: 75, radius: 200 },
+    baseHealth: 92, baseSpeed: 178,
   },
   {
     keywords: ['dark', 'shadow', 'void', 'death', 'necro', 'undead', 'curse', 'doom', 'lich', 'corrupt', 'evil'],
@@ -256,9 +256,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Soul Rend', type: 'projectile', damage: 38, cooldown: 9000, radius: 110, duration: 2000 },
     ability2: { name: 'Void Eruption', type: 'aoe', damage: 45, cooldown: 15000, radius: 170, duration: 3000 },
     ability3: { name: 'Eclipse', type: 'aoe', damage: 95, cooldown: 28000, radius: 250, duration: 5000 },
-    dash: { name: 'Shadow Step', cooldown: 4500, distance: 240 },
-    ult: { name: 'Abyssal Rift', cooldown: 24000, damage: 100, radius: 190 },
-    baseHealth: 88, baseSpeed: 155,
+    dash: { name: 'Shadow Step', description: 'Vanish into shadow and reappear ahead.', cooldown: 4500, distance: 240 },
+    ult: { name: 'Abyssal Rift', description: 'Tear open a rift to the abyss, damaging all nearby.', cooldown: 24000, damage: 100, radius: 190 },
+    baseHealth: 88, baseSpeed: 185,
   },
   {
     keywords: ['light', 'holy', 'divine', 'heal', 'angel', 'radiant', 'sun', 'solar', 'celestial', 'pure'],
@@ -270,9 +270,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Smite', type: 'projectile', damage: 32, cooldown: 7500, radius: 100, duration: 2000 },
     ability2: { name: 'Divine Judgment', type: 'aoe', damage: 42, cooldown: 14000, radius: 160, duration: 3500 },
     ability3: { name: 'Solar Flare', type: 'aoe', damage: 80, cooldown: 26000, radius: 230, duration: 4500 },
-    dash: { name: 'Flash of Light', cooldown: 3800, distance: 210 },
-    ult: { name: 'Celestial Wrath', cooldown: 21000, damage: 85, radius: 185 },
-    baseHealth: 95, baseSpeed: 145,
+    dash: { name: 'Flash of Light', description: 'Teleport in a flash of radiant light.', cooldown: 3800, distance: 210 },
+    ult: { name: 'Celestial Wrath', description: 'Call down divine judgment from the heavens.', cooldown: 21000, damage: 85, radius: 185 },
+    baseHealth: 95, baseSpeed: 175,
   },
   {
     keywords: ['earth', 'stone', 'rock', 'mountain', 'golem', 'crystal', 'geo', 'terra', 'quake', 'boulder'],
@@ -284,9 +284,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Rock Wall', type: 'aoe', damage: 28, cooldown: 8000, radius: 130, duration: 3000 },
     ability2: { name: 'Tectonic Surge', type: 'aoe', damage: 50, cooldown: 16000, radius: 180, duration: 4000 },
     ability3: { name: 'Earthquake', type: 'aoe', damage: 100, cooldown: 30000, radius: 260, duration: 6000 },
-    dash: { name: 'Stone Charge', cooldown: 5000, distance: 180 },
-    ult: { name: 'Mountain Fall', cooldown: 25000, damage: 110, radius: 200 },
-    baseHealth: 105, baseSpeed: 138,
+    dash: { name: 'Stone Charge', description: 'Charge through the earth with rocky force.', cooldown: 5000, distance: 180 },
+    ult: { name: 'Mountain Fall', description: 'Drop a massive boulder that shatters the ground.', cooldown: 25000, damage: 110, radius: 200 },
+    baseHealth: 105, baseSpeed: 168,
   },
   {
     keywords: ['wind', 'air', 'storm', 'lightning', 'thunder', 'tempest', 'gale', 'electric', 'shock', 'bolt'],
@@ -298,9 +298,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Chain Lightning', type: 'projectile', damage: 30, cooldown: 7000, radius: 100, duration: 2000 },
     ability2: { name: 'Cyclone', type: 'aoe', damage: 38, cooldown: 13000, radius: 150, duration: 3500 },
     ability3: { name: 'Supercell', type: 'aoe', damage: 75, cooldown: 23000, radius: 210, duration: 5500 },
-    dash: { name: 'Wind Rush', cooldown: 3000, distance: 260 },
-    ult: { name: 'Thunderstrike', cooldown: 18000, damage: 80, radius: 170 },
-    baseHealth: 82, baseSpeed: 165,
+    dash: { name: 'Wind Rush', description: 'Ride a gust of wind at blinding speed.', cooldown: 3000, distance: 260 },
+    ult: { name: 'Thunderstrike', description: 'Call down a massive bolt of lightning.', cooldown: 18000, damage: 80, radius: 170 },
+    baseHealth: 82, baseSpeed: 193,
   },
   {
     keywords: ['nature', 'plant', 'druid', 'forest', 'vine', 'bloom', 'leaf', 'tree', 'wood', 'thorn', 'poison', 'toxic'],
@@ -312,9 +312,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Bramble Trap', type: 'aoe', damage: 25, cooldown: 7500, radius: 120, duration: 3000 },
     ability2: { name: 'Overgrowth', type: 'aoe', damage: 40, cooldown: 14000, radius: 160, duration: 4000 },
     ability3: { name: 'Wrath of Nature', type: 'aoe', damage: 85, cooldown: 26000, radius: 240, duration: 5500 },
-    dash: { name: 'Vine Leap', cooldown: 4000, distance: 220 },
-    ult: { name: 'Verdant Storm', cooldown: 22000, damage: 80, radius: 190 },
-    baseHealth: 90, baseSpeed: 150,
+    dash: { name: 'Vine Leap', description: 'Leap forward on a vine of living growth.', cooldown: 4000, distance: 220 },
+    ult: { name: 'Verdant Storm', description: 'Unleash nature\'s fury in a storm of thorns and vines.', cooldown: 22000, damage: 80, radius: 190 },
+    baseHealth: 90, baseSpeed: 180,
   },
   {
     keywords: ['blood', 'vampire', 'drain', 'leech', 'crimson', 'sanguine', 'gore', 'red'],
@@ -326,9 +326,9 @@ const WIZARD_TEMPLATES = [
     ability1: { name: 'Life Drain', type: 'projectile', damage: 33, cooldown: 8500, radius: 110, duration: 2500 },
     ability2: { name: 'Blood Nova', type: 'aoe', damage: 45, cooldown: 15000, radius: 170, duration: 3000 },
     ability3: { name: 'Hemorrhage', type: 'aoe', damage: 90, cooldown: 27000, radius: 230, duration: 5500 },
-    dash: { name: 'Blood Rush', cooldown: 4200, distance: 210 },
-    ult: { name: 'Sanguine Tide', cooldown: 23000, damage: 95, radius: 195 },
-    baseHealth: 88, baseSpeed: 152,
+    dash: { name: 'Blood Rush', description: 'Surge forward fueled by blood magic.', cooldown: 4200, distance: 210 },
+    ult: { name: 'Sanguine Tide', description: 'Release a wave of blood magic that devastates all.', cooldown: 23000, damage: 95, radius: 195 },
+    baseHealth: 88, baseSpeed: 182,
   },
 ];
 
@@ -342,9 +342,9 @@ const DEFAULT_TEMPLATE = {
   ability1: { name: 'Arcane Barrage', type: 'aoe', damage: 32, cooldown: 8000, radius: 120, duration: 2500 },
   ability2: { name: 'Mana Storm', type: 'aoe', damage: 42, cooldown: 14000, radius: 160, duration: 3500 },
   ability3: { name: 'Arcane Annihilation', type: 'aoe', damage: 80, cooldown: 25000, radius: 220, duration: 5000 },
-  dash: { name: 'Blink', cooldown: 4000, distance: 220 },
-  ult: { name: 'Arcane Nova', cooldown: 22000, damage: 85, radius: 185 },
-  baseHealth: 90, baseSpeed: 152,
+  dash: { name: 'Blink', description: 'Teleport a short distance instantly.', cooldown: 4000, distance: 220 },
+  ult: { name: 'Arcane Nova', description: 'Detonate a sphere of pure arcane energy.', cooldown: 22000, damage: 85, radius: 185 },
+  baseHealth: 90, baseSpeed: 182,
 };
 
 function generateFromTemplate(prompt) {
@@ -364,7 +364,7 @@ function generateFromTemplate(prompt) {
   if (!bestTemplate) bestTemplate = DEFAULT_TEMPLATE;
   
   // Add some randomization to stats
-  const variance = () => 0.85 + Math.random() * 0.3; // 85%-115%
+  const variance = () => 0.95 + Math.random() * 0.15; // 95%-110%
   
   // Try to extract a custom name from the prompt
   const words = prompt.trim().split(/\s+/).filter(w => w.length >= 3);
@@ -441,7 +441,7 @@ function clampWizardOutput(data) {
   const baseSpeed = clamp(data.baseSpeed, CLAMP.baseSpeed[0], CLAMP.baseSpeed[1]);
 
   // Inverse correlation guard: if both high, pull one down
-  if (baseHealth > 100 && baseSpeed > 155) {
+  if (baseHealth > 100 && baseSpeed > 170) {
     // Can't have both maxed
   }
 
@@ -454,6 +454,7 @@ function clampWizardOutput(data) {
   const dash = {
     id: `custom_dash_${classId}`,
     name: (typeof dashData.name === 'string' ? dashData.name : 'Quick Dash').slice(0, 30),
+    description: (typeof dashData.description === 'string' ? dashData.description : 'Dash forward with elemental energy.').slice(0, 100),
     cooldown: clamp(dashData.cooldown, CLAMP.dash.cooldown[0], CLAMP.dash.cooldown[1]),
     distance: clamp(dashData.distance, CLAMP.dash.distance[0], CLAMP.dash.distance[1]),
     damage: 10,
@@ -465,6 +466,7 @@ function clampWizardOutput(data) {
   const ult = {
     id: `custom_ult_${classId}`,
     name: (typeof ultData.name === 'string' ? ultData.name : 'Power Surge').slice(0, 30),
+    description: (typeof ultData.description === 'string' ? ultData.description : 'Unleash a devastating burst of elemental power.').slice(0, 100),
     cooldown: clamp(ultData.cooldown, CLAMP.ult.cooldown[0], CLAMP.ult.cooldown[1]),
     damage: clamp(ultData.damage, CLAMP.ult.damage[0], CLAMP.ult.damage[1]),
     radius: clamp(ultData.radius, CLAMP.ult.radius[0], CLAMP.ult.radius[1]),

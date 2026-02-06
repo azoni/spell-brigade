@@ -8,12 +8,13 @@ export const CLASSES = {
     name: 'Pyromancer',
     color: '#ff6b35',
     baseHealth: 80,
-    baseSpeed: 160,
+    baseSpeed: 195,
     spells: ['fireball', 'flamewave'],
     description: 'Master of fire magic. High damage, lower health.',
     dashAbility: {
       id: 'fireDash',
       name: 'Fire Dash',
+      description: 'Dash forward leaving a trail of fire that burns enemies.',
       cooldown: 4000,
       distance: 200,
       damage: 15,
@@ -22,6 +23,7 @@ export const CLASSES = {
     ultimateAbility: {
       id: 'meteor',
       name: 'Meteor Strike',
+      description: 'Call down a massive meteor that explodes on impact.',
       cooldown: 20000,
       damage: 100,
       radius: 150,
@@ -33,12 +35,13 @@ export const CLASSES = {
     name: 'Cryomancer',
     color: '#4ecdc4',
     baseHealth: 90,
-    baseSpeed: 150,
+    baseSpeed: 185,
     spells: ['frostbolt', 'blizzard'],
     description: 'Ice wizard. Balanced stats with slowing effects.',
     dashAbility: {
       id: 'frostStep',
       name: 'Frost Step',
+      description: 'Teleport forward and freeze nearby enemies on arrival.',
       cooldown: 5000,
       distance: 180,
       freezeDuration: 2000,
@@ -47,6 +50,7 @@ export const CLASSES = {
     ultimateAbility: {
       id: 'iceNova',
       name: 'Ice Nova',
+      description: 'Unleash an ice explosion that freezes all enemies in range.',
       cooldown: 25000,
       damage: 50,
       radius: 200,
@@ -58,12 +62,13 @@ export const CLASSES = {
     name: 'Arcanist',
     color: '#9b5de5',
     baseHealth: 100,
-    baseSpeed: 140,
+    baseSpeed: 175,
     spells: ['arcaneBlast', 'magicMissile'],
     description: 'Pure arcane power. Tanky with AOE damage.',
     dashAbility: {
       id: 'blink',
       name: 'Blink',
+      description: 'Instantly teleport forward with brief invulnerability.',
       cooldown: 6000,
       distance: 250,
       invulnerable: true, // Brief invulnerability
@@ -71,6 +76,7 @@ export const CLASSES = {
     ultimateAbility: {
       id: 'arcaneBarrage',
       name: 'Arcane Barrage',
+      description: 'Unleash a barrage of homing arcane missiles.',
       cooldown: 18000,
       missiles: 12,
       damagePerMissile: 20,
@@ -85,7 +91,7 @@ export const CLASSES = {
     color: '#1a0a2e',
     secondaryColor: '#ff00ff',
     baseHealth: 95,
-    baseSpeed: 155,
+    baseSpeed: 190,
     spells: ['voidBolt', 'annihilate'],
     description: 'Master of the void. Unlocked by slaying the Dragon.',
     hidden: true, // Hidden until dragon is killed
@@ -93,6 +99,7 @@ export const CLASSES = {
     dashAbility: {
       id: 'voidShift',
       name: 'Void Shift',
+      description: 'Phase through the void, becoming invulnerable and dealing damage on arrival.',
       cooldown: 5000,
       distance: 200,
       invulnerable: true,
@@ -102,6 +109,7 @@ export const CLASSES = {
     ultimateAbility: {
       id: 'voidRift',
       name: 'Void Rift',
+      description: 'Tear open a massive rift that pulls enemies in and deals heavy damage.',
       cooldown: 22000,
       damage: 80,
       radius: 200,
@@ -117,7 +125,7 @@ export const CLASSES = {
     color: '#334155',
     secondaryColor: '#dc2626',
     baseHealth: 200,
-    baseSpeed: 280,
+    baseSpeed: 295,
     spells: ['shadowArrow', 'piercingVolley'],
     description: 'Elite shadow hunter. Admin exclusive.',
     isAdmin: true,
@@ -127,6 +135,7 @@ export const CLASSES = {
     dashAbility: {
       id: 'shadowStep',
       name: 'Shadow Step',
+      description: 'Vanish into shadow and reappear at target, dealing AOE damage.',
       cooldown: 2000,
       distance: 350,
       invulnerable: true,
@@ -136,6 +145,7 @@ export const CLASSES = {
     ultimateAbility: {
       id: 'arrowStorm',
       name: 'Arrow Storm',
+      description: 'Rain down a devastating storm of shadow arrows over a huge area.',
       cooldown: 10000,
       damage: 150,
       radius: 350,

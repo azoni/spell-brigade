@@ -312,6 +312,10 @@ export function gameTick() {
               if (enemy.health <= 0) continue;
               // DUNGEON ISOLATION: Only target enemies in same realm
               if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+              // DUNGEON ID ISOLATION: Only target enemies in same dungeon instance
+              if (playerInDungeon && (enemy.isDungeon || false)) {
+                if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
+              }
               
               const dist = distance(player, enemy);
               if (dist < targetDist) {
@@ -1425,8 +1429,10 @@ export function gameTick() {
         while (nearestPlayer.xp >= xpForLevel(nearestPlayer.level)) {
           nearestPlayer.xp -= xpForLevel(nearestPlayer.level);
           nearestPlayer.level++;
-          nearestPlayer.maxHealth += 10;
-          nearestPlayer.health = Math.min(nearestPlayer.health + 30, nearestPlayer.maxHealth);
+          nearestPlayer.maxHealth += 12;
+          nearestPlayer.health = Math.min(nearestPlayer.health + 40, nearestPlayer.maxHealth);
+          nearestPlayer.baseSpeed += 2; // Speed scales with level
+          nearestPlayer.damageMultiplier = (nearestPlayer.damageMultiplier || 1) * 1.03; // 3% more damage per level
           
           io.to(nearestPlayer.socketId).emit('levelUp', {
             level: nearestPlayer.level,

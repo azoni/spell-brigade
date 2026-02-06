@@ -140,11 +140,27 @@ io.on('connection', (socket) => {
     let customWizardData = null;
     
     if (isCustomWizard && playerClass && gameState.customWizards.has(playerClass)) {
-      // Custom wizard - load from stored wizards
+      // Custom wizard - load from stored wizards (active session)
       customWizardData = gameState.customWizards.get(playerClass);
       classData = customWizardData.classDef;
       validatedClass = playerClass; // Use the custom classId
       console.log(`🧙 Custom wizard join: ${playerName} as ${classData.name} (classId: ${playerClass})`);
+      
+      // Register custom spells globally so combat works
+      for (const [spellId, spellDef] of Object.entries(customWizardData.spellDefs)) {
+        SPELLS[spellId] = spellDef;
+      }
+    } else if (saved && saved.isCustomWizard && saved.customWizardData) {
+      // Custom wizard - restore from saved DB data (after server restart)
+      customWizardData = saved.customWizardData;
+      classData = customWizardData.classDef;
+      validatedClass = saved.class;
+      console.log(`🧙 Restored custom wizard from DB: ${classData.name} (classId: ${validatedClass})`);
+      
+      // Re-register in gameState so future lookups work
+      if (!gameState.customWizards.has(validatedClass)) {
+        gameState.customWizards.set(validatedClass, customWizardData);
+      }
       
       // Register custom spells globally so combat works
       for (const [spellId, spellDef] of Object.entries(customWizardData.spellDefs)) {
@@ -217,6 +233,7 @@ io.on('connection', (socket) => {
     if (customWizardData) {
       player.isCustomWizard = true;
       player.customClassId = validatedClass;
+      player.customWizardData = customWizardData; // Persist for DB save
       player.className = classData.name;
       player.color = classData.color;
       player.secondaryColor = classData.secondaryColor || classData.color;
@@ -238,6 +255,72 @@ io.on('connection', (socket) => {
 
     // Get rank
     const rank = RANKS.reduce((best, r) => totalXp >= r.xp ? r : best, RANKS[0]);
+
+    // Build enhanced class data with spell details for spellbook
+    const classAbilityMap = {
+      pyromancer: { 1: 'flameShield', 2: 'meteorStrike', 3: 'inferno' },
+      cryomancer: { 1: 'frostNova', 2: 'iceLance', 3: 'glacialStorm' },
+      arcanist: { 1: 'blink', 2: 'arcaneBarrage', 3: 'timeWarp' },
+      voidlord: { 1: 'voidRiftAbility', 2: 'soulDrain', 3: 'apocalypse' },
+      shadowarcher: { 1: 'huntersMark', 2: 'multishot', 3: 'deathArrow' },
+    };
+    
+    const enhancedClasses = {};
+    for (const [cid, cdata] of Object.entries(CLASSES)) {
+      const spellIds = cdata.spells || [];
+      const primarySpell = SPELLS[spellIds[0]];
+      const secondarySpell = SPELLS[spellIds[1]];
+      const abilityIds = classAbilityMap[cid] || {};
+      const abilities = [1, 2, 3].map(slot => {
+        const sid = abilityIds[slot];
+        return sid ? SPELLS[sid] : null;
+      }).filter(Boolean);
+      
+      enhancedClasses[cid] = {
+        ...cdata,
+        // Primary spell info
+        spellName: primarySpell?.name || 'Primary Attack',
+        spellDescription: primarySpell?.description || 'Automatically attacks nearby enemies.',
+        spellDamage: primarySpell?.damage,
+        spellCooldown: primarySpell?.cooldown,
+        spellRange: primarySpell?.range,
+        // Secondary spell info  
+        secondaryName: secondarySpell?.name,
+        secondaryDescription: secondarySpell?.description,
+        secondaryDamage: secondarySpell?.damage,
+        secondaryCooldown: secondarySpell?.cooldown,
+        secondaryRange: secondarySpell?.range,
+        // Class abilities (unlockable)
+        classAbilities: abilities,
+      };
+    }
+    
+    // For custom wizards, add their spell info to enhanced classes
+    if (customWizardData) {
+      const cwSpells = classData.spells || [];
+      const s1 = SPELLS[cwSpells[0]];
+      const s2 = SPELLS[cwSpells[1]];
+      const abilitySlots = classData.abilities || {};
+      const cwAbilities = [1, 2, 3].map(slot => {
+        const aid = abilitySlots[slot];
+        return aid ? SPELLS[aid] : null;
+      }).filter(Boolean);
+      
+      enhancedClasses[validatedClass] = {
+        ...classData,
+        spellName: s1?.name || 'Primary Attack',
+        spellDescription: s1?.description || 'Custom primary attack.',
+        spellDamage: s1?.damage,
+        spellCooldown: s1?.cooldown,
+        spellRange: s1?.range,
+        secondaryName: s2?.name,
+        secondaryDescription: s2?.description,
+        secondaryDamage: s2?.damage,
+        secondaryCooldown: s2?.cooldown,
+        secondaryRange: s2?.range,
+        classAbilities: cwAbilities,
+      };
+    }
 
     socket.emit('joined', {
       playerId: id,
@@ -269,7 +352,7 @@ io.on('connection', (socket) => {
       zones: ZONES,
       skins: SKINS,
       ranks: RANKS,
-      classes: CLASSES,
+      classes: enhancedClasses,
       spells: SPELLS,
     });
 
@@ -488,13 +571,14 @@ io.on('connection', (socket) => {
           io.emit('meteorWarning', { x: meteorX, y: meteorY, radius: ult.radius, delay: ult.delay });
           
           setTimeout(() => {
+            const ultDmg = Math.floor(ult.damage * (player.damageMultiplier || 1));
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
               // DUNGEON ISOLATION
               if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
               if (distance(enemy, { x: meteorX, y: meteorY }) < ult.radius) {
-                enemy.health -= ult.damage;
-                spawnDamageNumber(enemy.x, enemy.y - 20, ult.damage);
+                enemy.health -= ultDmg;
+                spawnDamageNumber(enemy.x, enemy.y - 20, ultDmg);
                 checkEnemyDeath(enemy, player.id);
               }
             }
@@ -505,14 +589,15 @@ io.on('connection', (socket) => {
           
         } else if (ult.id === 'iceNova') {
           // Ice nova - freeze and damage all nearby
+          const iceDmg = Math.floor(ult.damage * (player.damageMultiplier || 1));
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
             // DUNGEON ISOLATION
             if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, player) < ult.radius) {
-              enemy.health -= ult.damage;
+              enemy.health -= iceDmg;
               enemy.frozenUntil = now + ult.freezeDuration;
-              spawnDamageNumber(enemy.x, enemy.y - 20, ult.damage);
+              spawnDamageNumber(enemy.x, enemy.y - 20, iceDmg);
               checkEnemyDeath(enemy, player.id);
             }
           }
@@ -565,7 +650,7 @@ io.on('connection', (socket) => {
           // Apply damage and pull over the duration
           let ticks = 0;
           const maxTicks = Math.floor(ult.duration / 100);
-          const damagePerTick = ult.damage / maxTicks;
+          const damagePerTick = (ult.damage * (player.damageMultiplier || 1)) / maxTicks;
           
           const riftInterval = setInterval(() => {
             if (ticks >= maxTicks) {
@@ -656,7 +741,7 @@ io.on('connection', (socket) => {
               return;
             }
             
-            const dmgPerWave = ult.damage / ult.waves;
+            const dmgPerWave = Math.floor((ult.damage / ult.waves) * (player.damageMultiplier || 1));
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
               if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
@@ -690,26 +775,41 @@ io.on('connection', (socket) => {
           
           io.emit('sound', { type: 'arrowStorm', x: stormX, y: stormY });
         } else {
-          // Generic ultimate for custom wizards - simple AOE explosion
+          // Custom wizard ultimate - unique AOE burst with the wizard's own color/style
           const explosionX = tx ?? player.x;
           const explosionY = ty ?? player.y;
+          const ultColor = player.color || player.secondaryColor || '#a78bfa';
+          const ultName = ult.name || 'Custom Ultimate';
           
-          // Show warning
-          io.emit('meteorWarning', { x: explosionX, y: explosionY, radius: ult.radius, delay: ult.delay || 1000 });
+          // Show unique warning circle (NOT meteor)
+          io.emit('customUltWarning', { 
+            x: explosionX, y: explosionY, 
+            radius: ult.radius, 
+            delay: ult.delay || 1000,
+            color: ultColor,
+            name: ultName,
+            playerId: player.id,
+          });
           
           setTimeout(() => {
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
               if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
               if (distance(enemy, { x: explosionX, y: explosionY }) < ult.radius) {
-                enemy.health -= ult.damage;
-                spawnDamageNumber(enemy.x, enemy.y - 20, ult.damage);
+                const dmg = Math.floor(ult.damage * (player.damageMultiplier || 1));
+                enemy.health -= dmg;
+                spawnDamageNumber(enemy.x, enemy.y - 20, dmg);
                 checkEnemyDeath(enemy, player.id);
               }
             }
-            io.emit('explosion', { x: explosionX, y: explosionY, radius: ult.radius, color: player.color || '#a78bfa' });
-            spawnParticles(explosionX, explosionY, player.color || '#a78bfa', 20);
-            io.emit('sound', { type: 'meteor', x: explosionX, y: explosionY });
+            io.emit('customUltExplosion', { 
+              x: explosionX, y: explosionY, 
+              radius: ult.radius, 
+              color: ultColor,
+              name: ultName,
+            });
+            spawnParticles(explosionX, explosionY, ultColor, 25);
+            io.emit('sound', { type: 'customUlt', x: explosionX, y: explosionY });
           }, ult.delay || 1000);
         }
         
@@ -1031,8 +1131,9 @@ io.on('connection', (socket) => {
             // DUNGEON ISOLATION
             if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, player) < spell.radius) {
-              enemy.health -= spell.damage;
-              spawnDamageNumber(enemy.x, enemy.y - 10, spell.damage);
+              const sDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+              enemy.health -= sDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 10, sDmg);
               checkEnemyDeath(enemy, player.id);
             }
           }
@@ -1046,13 +1147,14 @@ io.on('connection', (socket) => {
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
         
         setTimeout(() => {
+          const msDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
             // DUNGEON ISOLATION
             if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (distance(enemy, { x: meteorX, y: meteorY }) < spell.radius) {
-              enemy.health -= spell.damage;
-              spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+              enemy.health -= msDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 20, msDmg);
               checkEnemyDeath(enemy, player.id);
             }
           }
@@ -1062,13 +1164,14 @@ io.on('connection', (socket) => {
         
       } else if (abilityId === 'inferno') {
         // Inferno - massive AOE around self
+        const infernoDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
         for (const enemy of gameState.enemies.values()) {
           if (enemy.health <= 0) continue;
           // DUNGEON ISOLATION
           if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
           if (distance(enemy, player) < spell.radius) {
-            enemy.health -= spell.damage;
-            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+            enemy.health -= infernoDmg;
+            spawnDamageNumber(enemy.x, enemy.y - 20, infernoDmg);
             checkEnemyDeath(enemy, player.id);
           }
         }
@@ -1078,14 +1181,15 @@ io.on('connection', (socket) => {
         
       } else if (abilityId === 'frostNova') {
         // Frost Nova - freeze nearby enemies
+        const frostDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
         for (const enemy of gameState.enemies.values()) {
           if (enemy.health <= 0) continue;
           // DUNGEON ISOLATION
           if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
           if (distance(enemy, player) < spell.radius) {
-            enemy.health -= spell.damage;
+            enemy.health -= frostDmg;
             enemy.frozenUntil = now + spell.freezeDuration;
-            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
+            spawnDamageNumber(enemy.x, enemy.y - 20, frostDmg);
             checkEnemyDeath(enemy, player.id);
           }
         }
@@ -1964,6 +2068,8 @@ io.on('connection', (socket) => {
           player.dungeonRoom = 0;
           player.customDungeonId = null;
           player.customDungeonConfig = null;
+          player.x = player.preDungeonX || 3500;
+          player.y = player.preDungeonY || 3000;
         }
         
         // Save and remove
@@ -1981,37 +2087,6 @@ io.on('connection', (socket) => {
         if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
         io.emit('chatMessage', leaveMsg);
         
-        break;
-      }
-    }
-  });
-
-  // Handle intentional leave (player wants to exit to menu)
-  socket.on('leave', () => {
-    for (const player of gameState.players.values()) {
-      if (player.socketId === socket.id) {
-        console.log(`👋 Player leaving: ${player.name}`);
-        
-        // If in dungeon, exit properly
-        if (player.inDungeon) {
-          player.inDungeon = false;
-          player.x = player.preDungeonX || 3500;
-          player.y = player.preDungeonY || 3000;
-        }
-        
-        // Broadcast leave message
-        const leaveMsg = {
-          id: uuidv4(),
-          type: 'system',
-          text: `${player.name} has left the game`,
-          timestamp: Date.now(),
-        };
-        gameState.chatMessages.push(leaveMsg);
-        if (gameState.chatMessages.length > 50) gameState.chatMessages.shift();
-        io.emit('chatMessage', leaveMsg);
-        
-        savePlayerToDb(player);
-        gameState.players.delete(player.id);
         break;
       }
     }

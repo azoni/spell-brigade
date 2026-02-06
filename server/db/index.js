@@ -52,6 +52,13 @@ export async function savePlayerToDb(player) {
     lastSeen: new Date().toISOString(),
   };
   
+  // Save custom wizard data so it survives server restarts
+  if (player.isCustomWizard && player.customClassId) {
+    data.isCustomWizard = true;
+    data.customClassId = player.customClassId;
+    data.customWizardData = player.customWizardData || null;
+  }
+  
   playersDb[player.id] = data;
   
   if (db) {
