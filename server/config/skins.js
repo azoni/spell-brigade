@@ -31,6 +31,8 @@ export const SKINS = {
   // Shadow Archer skins (Admin)
   shadowarcher_default: { id: 'shadowarcher_default', class: 'shadowarcher', name: 'Shadow Archer', color: '#334155', requiredXp: 0 },
   shadowarcher_crimson: { id: 'shadowarcher_crimson', class: 'shadowarcher', name: 'Crimson Hunter', color: '#991b1b', requiredXp: 0 },
+  brute_default: { id: 'brute_default', class: 'brute', name: 'The Brute', color: '#b45309', requiredXp: 0 },
+  brute_golden: { id: 'brute_golden', class: 'brute', name: 'Golden Gains', color: '#fbbf24', requiredXp: 0 },
 };
 
 // XP thresholds for titles/ranks

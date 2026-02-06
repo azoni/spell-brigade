@@ -102,18 +102,18 @@ io.on('connection', (socket) => {
     if (saved) {
       validatedClass = saved.class;
     } else {
-      // Shadow Archer requires admin (new character only)
-      if (playerClass === 'shadowarcher') {
+      // Brute requires admin (new character only)
+      if (playerClass === 'brute') {
         if (!isAdmin) {
           validatedClass = 'pyromancer';
-          console.log(`${playerName} tried to pick Shadow Archer without admin`);
+          console.log(`${playerName} tried to pick Brute without admin`);
         } else {
-          console.log(`Admin ${playerName} playing as Shadow Archer`);
+          console.log(`Admin ${playerName} playing as The Brute`);
         }
       }
       
-      // Voidlord requires dragon kill (new character only)
-      if (playerClass === 'voidlord') {
+      // Shadow Archer & Voidlord require dragon kill (new character only)
+      if (playerClass === 'shadowarcher' || playerClass === 'voidlord') {
         let hasDragonKill = false;
         // Check user's other characters for dragon kill
         if (sessionToken && sessionsDb[sessionToken]) {
@@ -130,7 +130,7 @@ io.on('connection', (socket) => {
         }
         if (!hasDragonKill && !isAdmin) {
           validatedClass = 'pyromancer';
-          console.log(`${playerName} tried to pick Void Lord without dragon kill`);
+          console.log(`${playerName} tried to pick ${playerClass} without dragon kill`);
         }
       }
     }
@@ -263,6 +263,7 @@ io.on('connection', (socket) => {
       arcanist: { 1: 'blink', 2: 'arcaneBarrage', 3: 'timeWarp' },
       voidlord: { 1: 'voidRiftAbility', 2: 'soulDrain', 3: 'apocalypse' },
       shadowarcher: { 1: 'huntersMark', 2: 'multishot', 3: 'deathArrow' },
+      brute: { 1: 'proteinShake', 2: 'barbellSpin', 3: 'ultimateFlex' },
     };
     
     const enhancedClasses = {};

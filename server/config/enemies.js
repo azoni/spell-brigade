@@ -320,14 +320,14 @@ export const ENEMY_TYPES = {
     summonCount: 4,
   },
   
-  // DRAGON BOSS - Final boss of dungeon (2.5x bigger)
+  // DRAGON BOSS - Final boss of dungeon (3x bigger)
   boss_dragon: {
     id: 'boss_dragon',
     name: 'Infernal Dragon',
     health: 40000,
     damage: 150,
     speed: 55,
-    radius: 200,
+    radius: 120,
     xp: 15000,
     color: '#b91c1c',
     behavior: 'boss_dragon',
