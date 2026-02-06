@@ -4,7 +4,7 @@
 export const PORT = process.env.PORT || 3001;
 export const TICK_RATE = 20;
 export const TICK_INTERVAL = 1000 / TICK_RATE;
-export const MAX_ENEMIES = 100;
+export const MAX_ENEMIES = 300;
 export const VIEW_DISTANCE = 1200;
 
 export const XP_ORB = {

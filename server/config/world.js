@@ -3,8 +3,8 @@
 // ===========================================
 
 export const WORLD = {
-  width: 7000,
-  height: 6000,
+  width: 21000,
+  height: 18000,
 };
 
 // Helper: Check if point is inside polygon
@@ -20,9 +20,9 @@ export function pointInPolygon(x, y, polygon) {
   return inside;
 }
 
-export const SANCTUARY_CENTER = { x: 3500, y: 3000 };
-export const SANCTUARY_RADIUS = 600;
-export const SANCTUARY_BUFFER = 200;
+export const SANCTUARY_CENTER = { x: 10500, y: 9000 };
+export const SANCTUARY_RADIUS = 1500;
+export const SANCTUARY_BUFFER = 500;
 
 export const ZONES = {
   sanctuary: {
@@ -38,12 +38,12 @@ export const ZONES = {
     y: SANCTUARY_CENTER.y,
     radius: SANCTUARY_RADIUS,
     polygon: [
-      { x: 3500, y: 2325 },
-      { x: 4025, y: 2663 },
-      { x: 4025, y: 3338 },
-      { x: 3500, y: 3675 },
-      { x: 2975, y: 3338 },
-      { x: 2975, y: 2663 },
+      { x: 10500, y: 7200 },
+      { x: 11900, y: 8100 },
+      { x: 11900, y: 9900 },
+      { x: 10500, y: 10800 },
+      { x: 9100, y: 9900 },
+      { x: 9100, y: 8100 },
     ],
   },
   dungeon: {
@@ -74,9 +74,9 @@ export const ZONES = {
     xpMultiplier: 1.0,
     recommendedLevel: 1,
     polygon: [
-      { x: 2500, y: 2000 }, { x: 4500, y: 2000 }, { x: 5000, y: 2500 },
-      { x: 5000, y: 3500 }, { x: 4500, y: 4000 }, { x: 2500, y: 4000 },
-      { x: 2000, y: 3500 }, { x: 2000, y: 2500 },
+      { x: 7500, y: 5500 }, { x: 13500, y: 5500 }, { x: 15000, y: 7000 },
+      { x: 15000, y: 11000 }, { x: 13500, y: 12500 }, { x: 7500, y: 12500 },
+      { x: 6000, y: 11000 }, { x: 6000, y: 7000 },
     ],
     excludeZones: ['sanctuary'],
   },
@@ -90,9 +90,9 @@ export const ZONES = {
     xpMultiplier: 1.5,
     recommendedLevel: 5,
     polygon: [
-      { x: 300, y: 300 }, { x: 2200, y: 300 }, { x: 2500, y: 2000 },
-      { x: 2000, y: 2500 }, { x: 1500, y: 2800 }, { x: 600, y: 2500 },
-      { x: 200, y: 1800 }, { x: 200, y: 800 },
+      { x: 500, y: 500 }, { x: 7000, y: 500 }, { x: 7500, y: 5500 },
+      { x: 6000, y: 7000 }, { x: 4500, y: 8500 }, { x: 1800, y: 7500 },
+      { x: 500, y: 5500 }, { x: 500, y: 2500 },
     ],
   },
   volcanic: {
@@ -105,9 +105,9 @@ export const ZONES = {
     xpMultiplier: 2.0,
     recommendedLevel: 10,
     polygon: [
-      { x: 4800, y: 300 }, { x: 6700, y: 300 }, { x: 6800, y: 1800 },
-      { x: 6500, y: 2500 }, { x: 5500, y: 2800 }, { x: 5000, y: 2500 },
-      { x: 4500, y: 2000 }, { x: 4500, y: 800 },
+      { x: 14000, y: 500 }, { x: 20500, y: 500 }, { x: 20500, y: 5500 },
+      { x: 20000, y: 7500 }, { x: 17000, y: 8500 }, { x: 15000, y: 7000 },
+      { x: 13500, y: 5500 }, { x: 13500, y: 2000 },
     ],
   },
   frozen: {
@@ -120,8 +120,8 @@ export const ZONES = {
     xpMultiplier: 2.5,
     recommendedLevel: 15,
     polygon: [
-      { x: 1800, y: 4000 }, { x: 5200, y: 4000 }, { x: 5500, y: 4500 },
-      { x: 5200, y: 5700 }, { x: 1800, y: 5700 }, { x: 1500, y: 4500 },
+      { x: 5500, y: 12500 }, { x: 15500, y: 12500 }, { x: 16500, y: 14000 },
+      { x: 15500, y: 17500 }, { x: 5500, y: 17500 }, { x: 4500, y: 14000 },
     ],
   },
   abyss: {
@@ -135,8 +135,8 @@ export const ZONES = {
     recommendedLevel: 20,
     bossChance: 0.02,
     polygon: [
-      { x: 100, y: 100 }, { x: 1000, y: 100 }, { x: 1200, y: 300 },
-      { x: 800, y: 1200 }, { x: 200, y: 1500 }, { x: 100, y: 800 },
+      { x: 200, y: 200 }, { x: 3500, y: 200 }, { x: 4000, y: 1500 },
+      { x: 3000, y: 4500 }, { x: 1000, y: 5000 }, { x: 200, y: 3500 },
     ],
   },
   crystal_caves: {
@@ -149,9 +149,9 @@ export const ZONES = {
     xpMultiplier: 1.8,
     recommendedLevel: 8,
     polygon: [
-      { x: 6000, y: 3000 }, { x: 6800, y: 2800 }, { x: 6900, y: 3500 },
-      { x: 6800, y: 4500 }, { x: 6200, y: 5000 }, { x: 5800, y: 4200 },
-      { x: 5800, y: 3400 },
+      { x: 18000, y: 8000 }, { x: 20500, y: 7500 }, { x: 20800, y: 9500 },
+      { x: 20500, y: 14000 }, { x: 18500, y: 15500 }, { x: 17000, y: 13000 },
+      { x: 17500, y: 10000 },
     ],
   },
 };
@@ -164,8 +164,8 @@ export const PORTALS = {
     id: 'portal_meadow',
     name: 'Meadow Portal',
     icon: '🌸',
-    from: { x: 3500, y: 2425 },  // North position in sanctuary
-    to: { x: 3500, y: 2100 },    // Just outside sanctuary in meadow
+    from: { x: 10500, y: 7500 },  // North position in sanctuary
+    to: { x: 10500, y: 6000 },    // Just outside sanctuary in meadow
     fromZone: 'sanctuary',
     toZone: 'meadow',
     color: '#84cc16',
@@ -176,8 +176,8 @@ export const PORTALS = {
     id: 'portal_forest',
     name: 'Forest Portal',
     icon: '🌲',
-    from: { x: 3050, y: 2750 },  // Northwest position
-    to: { x: 1400, y: 1400 },    // Center of forest
+    from: { x: 9300, y: 8400 },  // Northwest position
+    to: { x: 4000, y: 4000 },    // Center of forest
     fromZone: 'sanctuary',
     toZone: 'forest',
     color: '#166534',
@@ -188,8 +188,8 @@ export const PORTALS = {
     id: 'portal_volcanic',
     name: 'Volcanic Portal',
     icon: '🔥',
-    from: { x: 3950, y: 2750 },  // Northeast position
-    to: { x: 5800, y: 1400 },    // Center of volcanic
+    from: { x: 11700, y: 8400 },  // Northeast position
+    to: { x: 17000, y: 4000 },    // Center of volcanic
     fromZone: 'sanctuary',
     toZone: 'volcanic',
     color: '#dc2626',
@@ -200,8 +200,8 @@ export const PORTALS = {
     id: 'portal_frozen',
     name: 'Frozen Portal',
     icon: '❄️',
-    from: { x: 3500, y: 3575 },  // South position
-    to: { x: 3500, y: 4800 },    // Center of frozen
+    from: { x: 10500, y: 10500 },  // South position
+    to: { x: 10500, y: 15000 },    // Center of frozen
     fromZone: 'sanctuary',
     toZone: 'frozen',
     color: '#0ea5e9',
@@ -212,8 +212,8 @@ export const PORTALS = {
     id: 'portal_crystal',
     name: 'Crystal Portal',
     icon: '💎',
-    from: { x: 3950, y: 3250 },  // Southeast position
-    to: { x: 6300, y: 3800 },    // Center of crystal caves
+    from: { x: 11700, y: 9600 },  // Southeast position
+    to: { x: 19000, y: 11500 },    // Center of crystal caves
     fromZone: 'sanctuary',
     toZone: 'crystal_caves',
     color: '#ec4899',
@@ -224,8 +224,8 @@ export const PORTALS = {
     id: 'portal_abyss',
     name: 'Abyss Portal',
     icon: '🌀',
-    from: { x: 3050, y: 3250 },  // Southwest position
-    to: { x: 500, y: 700 },      // Center of abyss
+    from: { x: 9300, y: 9600 },  // Southwest position
+    to: { x: 1800, y: 2500 },      // Center of abyss
     fromZone: 'sanctuary',
     toZone: 'abyss',
     color: '#7c3aed',
@@ -239,8 +239,8 @@ export const BUILDINGS = {
   wizard_tower: {
     id: 'wizard_tower',
     name: "Archmage's Tower",
-    x: 3500, y: 2800,
-    width: 60, height: 100,
+    x: 9500, y: 9200,
+    width: 80, height: 120,
     zone: 'sanctuary',
     color: '#ffd93d',
     interactable: true,
@@ -250,7 +250,7 @@ export const BUILDINGS = {
   forest_ruins: {
     id: 'forest_ruins',
     name: 'Ancient Ruins',
-    x: 1200, y: 1600,
+    x: 3500, y: 4500,
     width: 150, height: 100,
     zone: 'forest',
     color: '#78716c',
@@ -260,7 +260,7 @@ export const BUILDINGS = {
   volcano_fortress: {
     id: 'volcano_fortress',
     name: 'Obsidian Fortress',
-    x: 5900, y: 1600,
+    x: 17500, y: 4500,
     width: 180, height: 140,
     zone: 'volcanic',
     color: '#7f1d1d',
@@ -270,7 +270,7 @@ export const BUILDINGS = {
   ice_citadel: {
     id: 'ice_citadel',
     name: 'Ice Citadel',
-    x: 3500, y: 5000,
+    x: 10500, y: 15500,
     width: 160, height: 130,
     zone: 'frozen',
     color: '#0284c7',
@@ -280,7 +280,7 @@ export const BUILDINGS = {
   void_shrine: {
     id: 'void_shrine',
     name: 'Void Shrine',
-    x: 500, y: 500,
+    x: 1800, y: 2000,
     width: 100, height: 100,
     zone: 'abyss',
     color: '#7c3aed',
@@ -290,7 +290,7 @@ export const BUILDINGS = {
   crystal_sanctum: {
     id: 'crystal_sanctum',
     name: 'Crystal Sanctum',
-    x: 6400, y: 4000,
+    x: 19200, y: 12000,
     width: 120, height: 110,
     zone: 'crystal_caves',
     color: '#ec4899',
@@ -301,13 +301,13 @@ export const BUILDINGS = {
   healing_fountain: {
     id: 'healing_fountain',
     name: 'Healing Fountain',
-    x: 3500, y: 3000,
+    x: 10500, y: 9000,
     width: 100, height: 100,
     zone: 'sanctuary',
     color: '#22c55e',
     interactable: false,
     isDecoration: true,
-    healingRadius: 100,
+    healingRadius: 250,
     healRate: 15, // HP per second when standing in fountain
   },
 };
@@ -349,7 +349,7 @@ export function getZoneAtPosition(x, y) {
 // Get random point inside a zone polygon
 export function getRandomPointInZone(zoneId) {
   const zone = ZONES[zoneId];
-  if (!zone || !zone.polygon) return { x: 3500, y: 3000 };
+  if (!zone || !zone.polygon) return { x: 10500, y: 9000 };
   
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of zone.polygon) {

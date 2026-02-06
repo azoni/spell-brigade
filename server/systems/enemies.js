@@ -182,8 +182,8 @@ export function spawnZoneBoss(zoneId) {
   const zone = ZONES[zoneId];
   if (!zone || zone.isSafe) return null;
   
-  const sanctuaryCenter = { x: 3500, y: 3000 };
-  const minDistanceFromSanctuary = 500;
+  const sanctuaryCenter = { x: 10500, y: 9000 };
+  const minDistanceFromSanctuary = 1500;
   
   let pos = null;
   for (let attempt = 0; attempt < 10; attempt++) {
