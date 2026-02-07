@@ -57,6 +57,11 @@ export async function savePlayerToDb(player) {
     data.isCustomWizard = true;
     data.customClassId = player.customClassId;
     data.customWizardData = player.customWizardData || null;
+    // Also save display fields directly for easy client access
+    data.customColor = player.color || player.customWizardData?.classDef?.color || null;
+    data.customSecondaryColor = player.secondaryColor || player.customWizardData?.classDef?.secondaryColor || null;
+    data.customClassName = player.className || player.customWizardData?.classDef?.name || null;
+    data.customIconStyle = player.iconStyle || player.customWizardData?.classDef?.iconStyle || 'star';
   }
   
   playersDb[player.id] = data;

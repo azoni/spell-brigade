@@ -237,6 +237,7 @@ io.on('connection', (socket) => {
       player.className = classData.name;
       player.color = classData.color;
       player.secondaryColor = classData.secondaryColor || classData.color;
+      player.iconStyle = classData.iconStyle || 'star';
       player.spells = classData.spells;
       player.dashAbility = classData.dashAbility;
       player.ultimateAbility = classData.ultimateAbility;
@@ -293,6 +294,11 @@ io.on('connection', (socket) => {
         secondaryRange: secondarySpell?.range,
         // Class abilities (unlockable)
         classAbilities: abilities,
+        // Dash & Ultimate display names for HUD
+        dash: cdata.dashAbility?.name || 'Dash',
+        dashCooldown: cdata.dashAbility?.cooldown || 3000,
+        ultimate: cdata.ultimateAbility?.name || 'Ultimate',
+        ultimateCooldown: cdata.ultimateAbility?.cooldown || 30000,
       };
     }
     
@@ -320,6 +326,11 @@ io.on('connection', (socket) => {
         secondaryCooldown: s2?.cooldown,
         secondaryRange: s2?.range,
         classAbilities: cwAbilities,
+        // Dash & Ultimate display names for HUD
+        dash: classData.dashAbility?.name || 'Dash',
+        dashCooldown: classData.dashAbility?.cooldown || 3000,
+        ultimate: classData.ultimateAbility?.name || 'Ultimate',
+        ultimateCooldown: classData.ultimateAbility?.cooldown || 30000,
       };
     }
 
@@ -348,6 +359,11 @@ io.on('connection', (socket) => {
         isAdmin: player.isAdmin || false,
         bossKills: player.bossKills,
         questComplete: player.questComplete,
+        isCustomWizard: player.isCustomWizard || false,
+        customColor: player.isCustomWizard ? player.color : undefined,
+        customSecondaryColor: player.isCustomWizard ? (player.secondaryColor || player.color) : undefined,
+        customClassName: player.isCustomWizard ? player.className : undefined,
+        customIconStyle: player.isCustomWizard ? (player.iconStyle || 'star') : undefined,
       },
       world: WORLD,
       zones: ZONES,
@@ -531,6 +547,24 @@ io.on('connection', (socket) => {
           spawnParticles(startX, startY, dashColor, 10);
           spawnParticles(player.x, player.y, dashColor, 10);
           io.emit('explosion', { x: player.x, y: player.y, radius: dash.damageRadius, color: dashColor });
+        } else if (dash.id && dash.id.startsWith('custom_')) {
+          // Generic custom wizard dash - trail damage + arrival particles
+          const cwDashColor = player.color || '#a78bfa';
+          if (dash.damage) {
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+              const distToLine = pointToLineDistance(enemy, { x: startX, y: startY }, { x: player.x, y: player.y });
+              if (distToLine < 40) {
+                enemy.health -= dash.damage;
+                spawnDamageNumber(enemy.x, enemy.y - 20, dash.damage);
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+          }
+          io.emit('dashTrail', { startX, startY, endX: player.x, endY: player.y, color: cwDashColor });
+          spawnParticles(startX, startY, cwDashColor, 8);
+          spawnParticles(player.x, player.y, cwDashColor, 10);
         }
         
         io.emit('sound', { type: 'dash', x: player.x, y: player.y, classId: player.class });
@@ -945,6 +979,22 @@ io.on('connection', (socket) => {
         if (buildingId && buildingUpgradeMap[buildingId] && buildingUpgradeMap[buildingId] !== type) {
           socket.emit('shopError', { message: 'This building does not offer that upgrade' });
           return;
+        }
+        
+        // Boss-kill gating: must defeat zone boss to use building
+        const buildingBossZone = {
+          forest_ruins: 'forest',
+          volcano_fortress: 'volcanic',
+          ice_citadel: 'frozen',
+          void_shrine: 'abyss',
+          crystal_sanctum: 'crystal_caves',
+        };
+        if (buildingId && buildingBossZone[buildingId]) {
+          const bossKills = player.bossKills || {};
+          if (!bossKills[buildingBossZone[buildingId]]) {
+            socket.emit('shopError', { message: 'You must defeat the zone boss first!' });
+            return;
+          }
         }
         
         const costs = {
@@ -1836,7 +1886,7 @@ io.on('connection', (socket) => {
   });
 
   // ===========================================
-  // AI WIZARD CREATOR (Admin only)
+  // AI WIZARD CREATOR - Custom class generation for all players
   // ===========================================
   // Rate limit tracking for wizard generation
   const wizardRateLimits = {};
@@ -1862,7 +1912,7 @@ io.on('connection', (socket) => {
       if (!wizardRateLimits[key]) wizardRateLimits[key] = [];
       // Clean old entries
       wizardRateLimits[key] = wizardRateLimits[key].filter(t => now - t < 600000);
-      if (wizardRateLimits[key].length >= 5) {
+      if (wizardRateLimits[key].length >= 8) {
         socket.emit('wizardGenerateError', { message: 'Rate limit reached. Please wait a few minutes before generating again.' });
         return;
       }
@@ -1879,7 +1929,7 @@ io.on('connection', (socket) => {
     const creatorName = player?.name || 'Admin';
 
     try {
-      socket.emit('wizardGenerateStatus', { message: '🧙 AI is crafting your wizard...' });
+      socket.emit('wizardGenerateStatus', { message: '🧙 Crafting your wizard class with AI...' });
       const result = await generateWizard(prompt.trim());
 
       if (result.error) {
@@ -1896,8 +1946,8 @@ io.on('connection', (socket) => {
       });
       console.log(`🧙 Custom wizard stored: classId=${result.classId}, total stored: ${gameState.customWizards.size}`);
 
-      // Cap stored wizards to 20
-      if (gameState.customWizards.size > 20) {
+      // Cap stored wizards to 50
+      if (gameState.customWizards.size > 50) {
         const oldest = [...gameState.customWizards.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
         if (oldest) gameState.customWizards.delete(oldest[0]);
       }
@@ -2076,6 +2126,7 @@ io.on('connection', (socket) => {
 
   // Handle explicit leave (player clicked "Return to Menu")
   socket.on('leave', () => {
+    let found = false;
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
         console.log(`🚪 Player leaving: ${player.name}`);
@@ -2094,6 +2145,7 @@ io.on('connection', (socket) => {
         // Save and remove
         savePlayerToDb(player);
         gameState.players.delete(player.id);
+        found = true;
         
         // Broadcast leave
         const leaveMsg = {
@@ -2109,6 +2161,8 @@ io.on('connection', (socket) => {
         break;
       }
     }
+    // Always confirm leave so client can safely re-join
+    socket.emit('left', { success: true, wasInGame: found });
   });
 
   socket.on('disconnect', () => {

@@ -1363,23 +1363,27 @@ export function gameTick() {
     if (!zone || zone.isSafe) continue;
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    const targetForZone = Math.max(5, playerCount * 10);
+    const targetForZone = Math.max(25, playerCount * 20);
     
     if (enemiesInZone < targetForZone) {
-      const spawnChance = 0.2 + (playerCount * 0.1);
-      if (Math.random() < spawnChance) {
-        spawnEnemyInZone(zoneId);
+      // Spawn multiple enemies per tick when underpopulated
+      const deficit = targetForZone - enemiesInZone;
+      const spawnsThisTick = Math.min(5, Math.ceil(deficit / 4));
+      for (let s = 0; s < spawnsThisTick; s++) {
+        if (Math.random() < 0.6) {
+          spawnEnemyInZone(zoneId);
+        }
       }
     }
   }
   
   // Also maintain some enemies in zones without players (for exploration)
-  const zoneOrder = ['meadow', 'forest', 'volcanic', 'frozen', 'abyss'];
+  const zoneOrder = ['meadow', 'forest', 'volcanic', 'frozen', 'abyss', 'crystal_caves'];
   for (const zoneId of zoneOrder) {
     if (playersPerZone[zoneId]) continue; // Already handled
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    if (enemiesInZone < 3 && Math.random() < 0.02) {
+    if (enemiesInZone < 15 && Math.random() < 0.15) {
       spawnEnemyInZone(zoneId);
     }
   }
@@ -1683,6 +1687,7 @@ export function gameTick() {
         emote: p.emote || null, emoteStart: p.emoteStart || null,
         isHealing: p.isHealing || false,
         bossKills: p.bossKills || {},
+        upgrades: p.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
         inDungeon: p.inDungeon || false,
         damageMultiplier: p.damageMultiplier || 1,
         speedMultiplier: p.speedMultiplier || 1,
@@ -1693,6 +1698,7 @@ export function gameTick() {
         customColor: p.isCustomWizard ? p.color : undefined,
         customSecondaryColor: p.isCustomWizard ? p.secondaryColor : undefined,
         customClassName: p.isCustomWizard ? p.className : undefined,
+        customIconStyle: p.isCustomWizard ? (p.iconStyle || 'star') : undefined,
       })),
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,

@@ -45,7 +45,7 @@ export const ZONES = {
   meadow: {
     id: 'meadow', name: 'Peaceful Meadow',
     description: 'Easy enemies. Good for beginners.',
-    color: '#84cc16', enemyLevel: 1, enemyTypes: ['slime', 'bat', 'bee', 'flower_sprite', 'mushroom'],
+    color: '#84cc16', enemyLevel: 1, enemyTypes: ['slime', 'bat', 'bee', 'flower_sprite', 'mushroom', 'meadow_beetle', 'caterpillar', 'spider', 'giant_toad', 'meadow_golem', 'scarecrow', 'giant_hornet', 'bramble_beast'],
     xpMultiplier: 1.0, recommendedLevel: 1,
     polygon: [
       { x: 7500, y: 5500 }, { x: 13500, y: 5500 }, { x: 15000, y: 7000 },
@@ -58,7 +58,7 @@ export const ZONES = {
     id: 'forest', name: 'Dark Forest',
     description: 'Moderate challenge. Spiders and skeletons lurk.',
     color: '#166534', enemyLevel: 2,
-    enemyTypes: ['skeleton', 'spider', 'ghost', 'necromancer', 'wolf', 'treant', 'forest_wisp'],
+    enemyTypes: ['skeleton', 'spider', 'ghost', 'necromancer', 'wolf', 'treant', 'forest_wisp', 'giant_spider', 'forest_troll', 'bear', 'dire_wolf', 'ancient_ent', 'swamp_horror', 'moss_golem', 'shadow_panther'],
     xpMultiplier: 1.5, recommendedLevel: 5,
     polygon: [
       { x: 500, y: 500 }, { x: 7000, y: 500 }, { x: 7500, y: 5500 },
@@ -70,7 +70,7 @@ export const ZONES = {
     id: 'volcanic', name: 'Volcanic Wastes',
     description: 'Fire elementals and golems. High risk, high reward.',
     color: '#dc2626', enemyLevel: 3,
-    enemyTypes: ['golem', 'fireElemental', 'necromancer', 'fire_imp', 'magma_crawler', 'ash_wraith'],
+    enemyTypes: ['golem', 'elemental', 'necromancer', 'fire_imp', 'magma_crawler', 'ash_wraith', 'lava_serpent', 'fire_spider', 'magma_giant', 'hell_hound', 'flame_wyrm', 'obsidian_sentinel', 'pyroclast'],
     xpMultiplier: 2.0, recommendedLevel: 10,
     polygon: [
       { x: 14000, y: 500 }, { x: 20500, y: 500 }, { x: 20500, y: 5500 },
@@ -82,7 +82,7 @@ export const ZONES = {
     id: 'frozen', name: 'Frozen Expanse',
     description: 'Ice elementals slow you down. Stay alert.',
     color: '#0ea5e9', enemyLevel: 4,
-    enemyTypes: ['iceElemental', 'ghost', 'skeleton', 'frost_wolf', 'yeti', 'ice_sprite'],
+    enemyTypes: ['iceElemental', 'ghost', 'skeleton', 'frost_wolf', 'yeti', 'ice_sprite', 'ice_spider', 'polar_bear', 'mammoth', 'frost_wraith', 'ice_golem', 'glacier_elemental', 'blizzard_phantom'],
     xpMultiplier: 2.5, recommendedLevel: 15,
     polygon: [
       { x: 5500, y: 12500 }, { x: 15500, y: 12500 }, { x: 16500, y: 14000 },
@@ -93,7 +93,7 @@ export const ZONES = {
     id: 'abyss', name: 'The Abyss',
     description: 'Only the strongest survive. Extreme danger.',
     color: '#7c3aed', enemyLevel: 5,
-    enemyTypes: ['golem', 'necromancer', 'shadow_wraith', 'void_crawler', 'dark_knight'],
+    enemyTypes: ['golem', 'necromancer', 'shadow_wraith', 'void_crawler', 'dark_knight', 'demon', 'abyssal_spider', 'shadow_titan', 'mind_flayer', 'abyssal_worm', 'eldritch_horror', 'doom_stalker'],
     xpMultiplier: 3.0, recommendedLevel: 20, bossChance: 0.02,
     polygon: [
       { x: 200, y: 200 }, { x: 3500, y: 200 }, { x: 4000, y: 1500 },
@@ -104,7 +104,7 @@ export const ZONES = {
     id: 'crystal_caves', name: 'Crystal Caves',
     description: 'Glittering crystals and dangerous golems.',
     color: '#ec4899', enemyLevel: 3,
-    enemyTypes: ['golem', 'ghost', 'spider', 'crystal_bat', 'gem_beetle', 'prism_wisp'],
+    enemyTypes: ['golem', 'ghost', 'spider', 'crystal_bat', 'gem_beetle', 'prism_wisp', 'crystal_golem', 'crystal_drake', 'geode_golem', 'shard_swarm', 'prismatic_hydra', 'crystal_sentinel'],
     xpMultiplier: 1.8, recommendedLevel: 8,
     polygon: [
       { x: 18000, y: 8000 }, { x: 20500, y: 7500 }, { x: 20800, y: 9500 },

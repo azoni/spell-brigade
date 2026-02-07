@@ -16,6 +16,26 @@ export function initEnemySystem(ioRef) {
   io = ioRef;
 }
 
+// Pre-populate the world with enemies so zones aren't empty on start
+export function populateWorld() {
+  const zoneCounts = {
+    meadow: 35,
+    forest: 30,
+    volcanic: 25,
+    frozen: 25,
+    abyss: 20,
+    crystal_caves: 25,
+  };
+  let total = 0;
+  for (const [zoneId, count] of Object.entries(zoneCounts)) {
+    for (let i = 0; i < count; i++) {
+      spawnEnemyInZone(zoneId);
+      total++;
+    }
+  }
+  console.log(`🐛 World populated with ${total} enemies across ${Object.keys(zoneCounts).length} zones`);
+}
+
 // ===========================================
 // ENEMY SPAWNING (Zone-based)
 // ===========================================

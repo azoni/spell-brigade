@@ -18,7 +18,7 @@ import { playersDb, savePlayerToDb } from './db/index.js';
 import { registerAuthRoutes } from './auth/index.js';
 
 // Systems
-import { initEnemySystem, initZoneBosses } from './systems/enemies.js';
+import { initEnemySystem, initZoneBosses, populateWorld } from './systems/enemies.js';
 import { initTickSystem, gameTick } from './systems/tick.js';
 
 // Socket events
@@ -85,6 +85,9 @@ setInterval(gameTick, TICK_INTERVAL);
 // Initialize zone bosses
 initZoneBosses();
 console.log('👑 Zone bosses initialized');
+
+// Pre-populate world with enemies
+populateWorld();
 
 // Initialize NPCs
 initNpcs();

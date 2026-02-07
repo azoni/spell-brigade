@@ -1,24 +1,27 @@
 // ===========================================
-// LLM API - Supports Anthropic direct + OpenRouter fallback
+// ANTHROPIC API - Claude-powered LLM utility
 // ===========================================
 
-const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY || '';
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY || '';
+const MODEL = 'claude-sonnet-4-20250514';
 
+// Detect which API to use based on key format
 function isAnthropicKey() {
-  return API_KEY.startsWith('sk-ant-');
+  return ANTHROPIC_API_KEY.startsWith('sk-ant-');
 }
 
 export function isLLMEnabled() {
-  return !!API_KEY;
+  return !!ANTHROPIC_API_KEY;
 }
 
 /**
- * Call LLM with a system + user prompt, expect JSON back.
- * Auto-detects Anthropic vs OpenRouter from key format.
+ * Call Claude with a system + user prompt, expect JSON back.
+ * Returns parsed JSON or null on failure.
+ * Supports both Anthropic direct and OpenRouter as fallback.
  */
 export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500) {
-  if (!API_KEY) {
-    console.warn('⚠️ No API key set (ANTHROPIC_API_KEY or OPENROUTER_API_KEY), LLM disabled');
+  if (!ANTHROPIC_API_KEY) {
+    console.warn('⚠️ No API key set, LLM features disabled');
     return null;
   }
 
@@ -35,19 +38,20 @@ export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500) {
 }
 
 async function callAnthropic(systemPrompt, userPrompt, maxTokens) {
-  console.log('🤖 Calling Anthropic API (Claude Sonnet)...');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key': API_KEY,
+      'x-api-key': ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL,
       max_tokens: maxTokens,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+      messages: [
+        { role: 'user', content: userPrompt },
+      ],
     }),
   });
 
@@ -61,17 +65,17 @@ async function callAnthropic(systemPrompt, userPrompt, maxTokens) {
   const content = data.content?.[0]?.text;
   if (!content) return null;
 
+  // Extract JSON from response (may be wrapped in markdown fences)
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
   return JSON.parse(jsonMatch[0]);
 }
 
 async function callOpenRouter(systemPrompt, userPrompt, maxTokens) {
-  console.log('🤖 Calling OpenRouter API...');
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${API_KEY}`,
+      'Authorization': `Bearer ${ANTHROPIC_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://spell-brigade.onrender.com',
       'X-Title': 'Spell Brigade',
