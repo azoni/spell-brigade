@@ -1363,14 +1363,14 @@ export function gameTick() {
     if (!zone || zone.isSafe) continue;
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    const targetForZone = Math.max(25, playerCount * 20);
+    const targetForZone = Math.max(50, playerCount * 35);
     
     if (enemiesInZone < targetForZone) {
       // Spawn multiple enemies per tick when underpopulated
       const deficit = targetForZone - enemiesInZone;
-      const spawnsThisTick = Math.min(5, Math.ceil(deficit / 4));
+      const spawnsThisTick = Math.min(8, Math.ceil(deficit / 3));
       for (let s = 0; s < spawnsThisTick; s++) {
-        if (Math.random() < 0.6) {
+        if (Math.random() < 0.75) {
           spawnEnemyInZone(zoneId);
         }
       }
@@ -1383,7 +1383,7 @@ export function gameTick() {
     if (playersPerZone[zoneId]) continue; // Already handled
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    if (enemiesInZone < 15 && Math.random() < 0.15) {
+    if (enemiesInZone < 30 && Math.random() < 0.25) {
       spawnEnemyInZone(zoneId);
     }
   }

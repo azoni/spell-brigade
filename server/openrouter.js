@@ -15,8 +15,9 @@ export function isLLMEnabled() {
 /**
  * Call LLM with a system + user prompt, expect JSON back.
  * Auto-detects Anthropic vs OpenRouter from key format.
+ * quality: 'standard' = Haiku (fast), 'premium' = Sonnet (higher quality)
  */
-export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500) {
+export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500, quality = 'premium') {
   if (!API_KEY) {
     console.warn('⚠️ No API key set (ANTHROPIC_API_KEY or OPENROUTER_API_KEY), LLM disabled');
     return null;
@@ -24,9 +25,9 @@ export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500) {
 
   try {
     if (isAnthropicKey()) {
-      return await callAnthropic(systemPrompt, userPrompt, maxTokens);
+      return await callAnthropic(systemPrompt, userPrompt, maxTokens, quality);
     } else {
-      return await callOpenRouter(systemPrompt, userPrompt, maxTokens);
+      return await callOpenRouter(systemPrompt, userPrompt, maxTokens, quality);
     }
   } catch (err) {
     console.error('LLM call failed:', err.message);
@@ -34,8 +35,9 @@ export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500) {
   }
 }
 
-async function callAnthropic(systemPrompt, userPrompt, maxTokens) {
-  console.log('🤖 Calling Anthropic API (Claude Sonnet)...');
+async function callAnthropic(systemPrompt, userPrompt, maxTokens, quality = 'premium') {
+  const model = quality === 'standard' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-20250514';
+  console.log(`🤖 Calling Anthropic API (${quality === 'standard' ? 'Haiku - Standard' : 'Sonnet - Premium'})...`);
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -44,7 +46,7 @@ async function callAnthropic(systemPrompt, userPrompt, maxTokens) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -66,8 +68,9 @@ async function callAnthropic(systemPrompt, userPrompt, maxTokens) {
   return JSON.parse(jsonMatch[0]);
 }
 
-async function callOpenRouter(systemPrompt, userPrompt, maxTokens) {
-  console.log('🤖 Calling OpenRouter API...');
+async function callOpenRouter(systemPrompt, userPrompt, maxTokens, quality = 'premium') {
+  const model = quality === 'standard' ? 'anthropic/claude-haiku-4-5-20251001' : 'anthropic/claude-sonnet-4-20250514';
+  console.log(`🤖 Calling OpenRouter API (${quality === 'standard' ? 'Haiku - Standard' : 'Sonnet - Premium'})...`);
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -77,7 +80,7 @@ async function callOpenRouter(systemPrompt, userPrompt, maxTokens) {
       'X-Title': 'Spell Brigade',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4-20250514',
+      model,
       max_tokens: maxTokens,
       temperature: 0.8,
       messages: [

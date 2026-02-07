@@ -19,12 +19,12 @@ export function initEnemySystem(ioRef) {
 // Pre-populate the world with enemies so zones aren't empty on start
 export function populateWorld() {
   const zoneCounts = {
-    meadow: 35,
-    forest: 30,
-    volcanic: 25,
-    frozen: 25,
-    abyss: 20,
-    crystal_caves: 25,
+    meadow: 70,
+    forest: 60,
+    volcanic: 50,
+    frozen: 50,
+    abyss: 45,
+    crystal_caves: 50,
   };
   let total = 0;
   for (const [zoneId, count] of Object.entries(zoneCounts)) {

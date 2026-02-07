@@ -1891,7 +1891,9 @@ io.on('connection', (socket) => {
   // Rate limit tracking for wizard generation
   const wizardRateLimits = {};
   
-  socket.on('generateWizard', async ({ prompt, sessionToken }) => {
+  socket.on('generateWizard', async ({ prompt, sessionToken, quality }) => {
+    // Validate quality parameter
+    const modelQuality = quality === 'standard' ? 'standard' : 'premium';
     // Check admin status (for "Play as" feature later)
     let isAdmin = isAdminSocket(io, socket.id);
     if (!isAdmin && sessionToken && sessionsDb[sessionToken]) {
@@ -1930,7 +1932,7 @@ io.on('connection', (socket) => {
 
     try {
       socket.emit('wizardGenerateStatus', { message: '🧙 Crafting your wizard class with AI...' });
-      const result = await generateWizard(prompt.trim());
+      const result = await generateWizard(prompt.trim(), modelQuality);
 
       if (result.error) {
         socket.emit('wizardGenerateError', { message: result.error });
@@ -1959,6 +1961,8 @@ io.on('connection', (socket) => {
         classId: result.classId,
         classDef: result.classDef,
         spellDefs: result.spellDefs,
+        generatedBy: result.generatedBy || 'unknown',
+        modelUsed: result.modelUsed || null,
       });
     } catch (err) {
       console.error('Wizard generation error:', err);

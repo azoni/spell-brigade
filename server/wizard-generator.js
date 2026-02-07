@@ -10,6 +10,16 @@ Players roam zones killing monsters, leveling up, and unlocking abilities.
 
 Your job: turn a player's wizard concept into a fully realized, balanced, FUN class — like it was hand-designed.
 
+## CRITICAL: HONOR THE PLAYER'S VISION
+The player might describe ANYTHING — a lightning samurai, a giraffe that throws chairs, a pizza wizard, a cosmic horror squid, a robot made of bees. YOUR JOB is to make it WORK as a playable class. Be WILDLY creative with spell names and descriptions while keeping the numbers balanced.
+
+Examples of good adaptation:
+- "giraffe that throws chairs" → "Chair Giraffe" class with spells like "Folding Chair Fling" (projectile), "Table Flip" (AOE), "Neck Whip" (dash)
+- "pizza wizard" → "Slice Mage" with "Pepperoni Bolt", "Cheese Flood" (AOE slow), "Delivery Dash"
+- "darkness edgelord" → "Abyssal Reaper" with "Shadow Rend", "Void Collapse", "Death's Door"
+
+The spell NAMES and DESCRIPTIONS must directly reference the player's concept. Generic names like "Energy Bolt" or "Power Strike" are FORBIDDEN — every spell must feel unique to what the player described.
+
 ## HOW COMBAT WORKS
 - 2 base spells auto-fire at nearest enemy (left-click primary, right-click secondary)
 - 3 class abilities unlock at levels 10, 20, 30 (hotkeys 1/2/3)
@@ -50,16 +60,18 @@ Shadow Archer (fragile sniper): HP 75, Speed 200
   Ult: Arrow Storm — 70dmg, 22s cd, radius 250, 5 waves
 
 ## DESIGN PHILOSOPHY
-1. HONOR THE PLAYER'S VISION — if they say "lightning samurai", it must FEEL like one
+1. HONOR THE PLAYER'S VISION — if they say "giraffe that throws chairs", EVERY spell must reference giraffes and chairs
 2. Each class needs a CLEAR IDENTITY — what makes it unique? Speed? Control? Burst? Sustain?
 3. Spells should SYNERGIZE — e.g. slow from spell1 helps spell2 land
 4. Balance: high damage = high cooldown, high HP = lower speed, fast attacks = lower per-hit damage
 5. Primary DPS (damage/cooldown*1000) should be 25-45 range
-6. Colors MUST match the theme — fire=orange/red, ice=cyan/blue, nature=green, void=purple/magenta
+6. Colors MUST match the theme — pick colors that FIT the concept (giraffe=amber/brown, pizza=red/yellow, cosmic=purple/teal)
 7. Abilities SCALE: Lv10 is utility/moderate, Lv20 is strong, Lv30 is devastating
 8. Special effects (slow/piercing/homing) used sparingly — max 1-2 per class
-9. Dash should match theme (fire=flame trail, shadow=teleport, earth=charge)
-10. Names should be evocative — "Void Bolt" not "Dark Projectile"
+9. Dash should match theme (fire=flame trail, shadow=teleport, giraffe=long stride, robot=jet boost)
+10. Names should be evocative AND thematic — "Folding Chair Fling" not "Chair Attack", "Pepperoni Bolt" not "Food Projectile"
+11. Lore should be 1-2 sentences explaining the class's backstory in a fun way
+12. The description should be a catchy one-liner that sells the class fantasy
 
 ## OUTPUT — RESPOND WITH ONLY THIS JSON, NO MARKDOWN, NO EXPLANATION:
 {
@@ -304,23 +316,31 @@ function clampWizardOutput(data) {
 // ===========================================
 // MAIN ENTRY POINT
 // ===========================================
-export async function generateWizard(prompt) {
+export async function generateWizard(prompt, quality = 'premium') {
   if (isLLMEnabled()) {
-    console.log(`🧙 Generating wizard via LLM: "${prompt}"`);
+    console.log(`🧙 Generating wizard via LLM (${quality}): "${prompt}"`);
     const llmData = await llmGenerate(
       WIZARD_SYSTEM_PROMPT,
       `Create a wizard class based on this player concept:\n\n"${prompt}"\n\nRespond with ONLY the JSON. No markdown fences, no explanation.`,
-      1500
+      1500,
+      quality
     );
     if (llmData) {
       console.log(`🧙 LLM returned: "${llmData.name}"`);
-      return clampWizardOutput(llmData);
+      const result = clampWizardOutput(llmData);
+      result.generatedBy = 'ai';
+      result.modelUsed = quality;
+      return result;
     }
     console.warn('LLM generation failed, falling back to templates');
+  } else {
+    console.log('🧙 No API key configured — using template fallback');
   }
 
   console.log(`🧙 Template fallback: "${prompt}"`);
-  return generateFromTemplate(prompt);
+  const result = generateFromTemplate(prompt);
+  result.generatedBy = 'template';
+  return result;
 }
 
 // ===========================================
