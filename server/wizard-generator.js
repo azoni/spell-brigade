@@ -126,8 +126,27 @@ Shadow Archer (fragile sniper): HP 75, Speed 200
     "damage": 60-120, "radius": 140-250,
     "description": "What the ult does"
   },
-  "iconStyle": "skull|flame|crystal|moon|bolt|leaf|shield|eye|sword|spiral|wave|star"
-}`;
+  "iconStyle": "skull|flame|crystal|moon|bolt|leaf|shield|eye|sword|spiral|wave|star",
+  "bodyStyle": "wizard|warrior|archer|hulk|beast|elemental|creature",
+  "projectileShape": "orb|bolt|thrown|shard|wisp|arrow",
+  "headgear": "pointyHat|hood|helmet|crown|horns|none|antlers|halo|ears"
+}
+
+AVATAR VISUAL RULES:
+- bodyStyle determines the character's silhouette on screen. MATCH IT to the concept:
+  "wizard" = classic robed mage (default), "warrior" = armored fighter, "archer" = slim + hooded,
+  "hulk" = massive muscular body (ogres, giants, brutes), "beast" = animal/furry body,
+  "elemental" = pure energy being (no solid form), "creature" = alien/tentacled/weird
+- projectileShape determines what the auto-attack looks like:
+  "orb" = glowing sphere, "bolt" = elongated energy, "thrown" = spinning object (pizza, chair, dumbbell),
+  "shard" = angular crystal, "wisp" = ghostly trail, "arrow" = pointed triangular
+- headgear: pick what fits. Giraffe? "none" or "horns". Knight? "helmet". Wizard? "pointyHat". Beast? "ears"
+- Examples: pizza wizard → bodyStyle:"wizard", projectileShape:"thrown", headgear:"pointyHat"
+  lightning samurai → bodyStyle:"warrior", projectileShape:"bolt", headgear:"helmet"
+  cosmic horror squid → bodyStyle:"creature", projectileShape:"wisp", headgear:"none"
+  robot made of bees → bodyStyle:"creature", projectileShape:"thrown", headgear:"none"
+  shadow assassin → bodyStyle:"archer", projectileShape:"bolt", headgear:"hood"
+  rage ogre → bodyStyle:"hulk", projectileShape:"thrown", headgear:"horns"`;
 
 // Stat clamping
 const CLAMP = {
@@ -139,19 +158,22 @@ const CLAMP = {
     range: [150, 550],
     speed: [0, 900],
     radiusProjectile: [5, 18],
-    radiusAoe: [60, 200],
+    radiusAoe: [80, 220],
   },
   dash: { cooldown: [3000, 7000], distance: [140, 280] },
-  ult: { cooldown: [15000, 30000], damage: [40, 130], radius: [100, 260] },
+  ult: { cooldown: [15000, 30000], damage: [40, 130], radius: [140, 280] },
   ability: {
-    1: { damage: [15, 50], cooldown: [8000, 15000], radius: [60, 180], duration: [2000, 6000] },
-    2: { damage: [30, 90], cooldown: [12000, 22000], radius: [80, 220], duration: [2000, 5000] },
-    3: { damage: [80, 170], cooldown: [28000, 55000], radius: [140, 300], duration: [3000, 8000] },
+    1: { damage: [15, 50], cooldown: [8000, 15000], radius: [100, 200], duration: [2000, 6000] },
+    2: { damage: [30, 90], cooldown: [12000, 22000], radius: [130, 240], duration: [2000, 5000] },
+    3: { damage: [80, 170], cooldown: [28000, 55000], radius: [180, 320], duration: [3000, 8000] },
   },
 };
 
 // Valid icon styles that match client WIZARD_ICONS
 const VALID_ICON_STYLES = ['skull', 'flame', 'crystal', 'moon', 'bolt', 'leaf', 'shield', 'eye', 'sword', 'spiral', 'wave', 'star'];
+const VALID_BODY_STYLES = ['wizard', 'warrior', 'archer', 'hulk', 'beast', 'elemental', 'creature'];
+const VALID_PROJECTILE_SHAPES = ['orb', 'bolt', 'thrown', 'shard', 'wisp', 'arrow'];
+const VALID_HEADGEAR = ['pointyHat', 'hood', 'helmet', 'crown', 'horns', 'none', 'antlers', 'halo', 'ears'];
 
 // Auto-pick icon based on class theme if LLM didn't provide one
 function pickIconStyle(data) {
@@ -168,6 +190,40 @@ function pickIconStyle(data) {
   if (/time|chrono|spiral|portal|rift|void|warp|dimension/.test(text)) return 'spiral';
   if (/water|ocean|wave|tide|sea|aqua|flood|rain/.test(text)) return 'wave';
   return 'star'; // default
+}
+
+function pickBodyStyle(data) {
+  const text = `${data.name || ''} ${data.description || ''} ${data.lore || ''}`.toLowerCase();
+  if (/hulk|brute|ogre|giant|golem|titan|colossus|troll|orc|muscle|buff|rage/.test(text)) return 'hulk';
+  if (/archer|ranger|sniper|hunter|assassin|rogue|thief|ninja|shadow/.test(text)) return 'archer';
+  if (/warrior|knight|paladin|samurai|gladiator|fighter|soldier|guard|swords/.test(text)) return 'warrior';
+  if (/beast|animal|wolf|bear|cat|dragon|giraffe|dog|lion|tiger|fox|deer/.test(text)) return 'beast';
+  if (/elemental|spirit|energy|wisp|ghost|phantom|spectral|ethereal|cosmic|astral/.test(text)) return 'elemental';
+  if (/creature|tentacle|squid|alien|horror|aberration|bug|insect|robot|bee|spider/.test(text)) return 'creature';
+  return 'wizard';
+}
+
+function pickProjectileShape(data) {
+  const text = `${data.name || ''} ${data.description || ''} ${data.spell1?.name || ''}`.toLowerCase();
+  if (/throw|fling|hurl|toss|pizza|chair|rock|bomb|grenade|object|dumbbell/.test(text)) return 'thrown';
+  if (/arrow|dart|spike|needle|javelin|spear|lance/.test(text)) return 'arrow';
+  if (/bolt|beam|ray|laser|lightning|zap|shock|strike/.test(text)) return 'bolt';
+  if (/shard|crystal|gem|ice|frost|prism|glass/.test(text)) return 'shard';
+  if (/wisp|ghost|spirit|soul|phantom|haunt|ethereal|smoke|mist/.test(text)) return 'wisp';
+  return 'orb';
+}
+
+function pickHeadgear(data) {
+  const text = `${data.name || ''} ${data.description || ''} ${data.lore || ''}`.toLowerCase();
+  if (/beast|animal|wolf|bear|cat|fox|bunny|rabbit|dog/.test(text)) return 'ears';
+  if (/helmet|knight|warrior|paladin|soldier|gladiator|samurai/.test(text)) return 'helmet';
+  if (/hood|rogue|assassin|thief|shadow|ranger|ninja|archer/.test(text)) return 'hood';
+  if (/crown|king|queen|royal|noble|prince|princess/.test(text)) return 'crown';
+  if (/horn|demon|devil|dragon|bull|ram|goat|minotaur|ogre|oni/.test(text)) return 'horns';
+  if (/antler|deer|elk|moose|stag|druid|forest/.test(text)) return 'antlers';
+  if (/angel|divine|holy|celestial|seraph/.test(text)) return 'halo';
+  if (/robot|golem|elemental|slime|blob|cosmic|tentacle|alien|bug/.test(text)) return 'none';
+  return 'pointyHat';
 }
 
 function clamp(val, min, max) {
@@ -298,6 +354,9 @@ function clampWizardOutput(data) {
       description: (typeof data.description === 'string' ? data.description : 'A custom AI-generated wizard.').slice(0, 100),
       lore: (typeof data.lore === 'string' ? data.lore : '').slice(0, 300),
       iconStyle: VALID_ICON_STYLES.includes(data.iconStyle) ? data.iconStyle : pickIconStyle(data),
+      bodyStyle: VALID_BODY_STYLES.includes(data.bodyStyle) ? data.bodyStyle : pickBodyStyle(data),
+      projectileShape: VALID_PROJECTILE_SHAPES.includes(data.projectileShape) ? data.projectileShape : pickProjectileShape(data),
+      headgear: VALID_HEADGEAR.includes(data.headgear) ? data.headgear : pickHeadgear(data),
       isCustom: true,
       dashAbility: dash,
       ultimateAbility: ult,

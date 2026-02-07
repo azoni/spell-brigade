@@ -19,12 +19,12 @@ export function initEnemySystem(ioRef) {
 // Pre-populate the world with enemies so zones aren't empty on start
 export function populateWorld() {
   const zoneCounts = {
-    meadow: 70,
-    forest: 60,
-    volcanic: 50,
-    frozen: 50,
-    abyss: 45,
-    crystal_caves: 50,
+    meadow: 140,
+    forest: 120,
+    volcanic: 100,
+    frozen: 100,
+    abyss: 90,
+    crystal_caves: 100,
   };
   let total = 0;
   for (const [zoneId, count] of Object.entries(zoneCounts)) {
@@ -333,17 +333,22 @@ export function onBossDeath(enemy, killer) {
         killer.questComplete = true;
         killer.questReward = 'realm_conqueror';
         
-        const rewardXp = 5000;
+        // Big quest reward: XP + permanent stat bonuses
+        const rewardXp = 10000;
         killer.xp += rewardXp;
         killer.totalXp += rewardXp;
+        killer.maxHealth += 50;  // Permanent +50 HP
+        killer.health = killer.maxHealth; // Full heal
+        killer.damageMultiplier = (killer.damageMultiplier || 1) * 1.15; // Permanent +15% damage
         
         const socket = io.sockets.sockets.get(killer.socketId);
         if (socket) {
           socket.emit('questComplete', {
             quest: 'conquer_realm',
-            title: 'Realm Conqueror',
+            title: 'Champion of the Realm',
             reward: 'realm_conqueror',
             xp: rewardXp,
+            bonuses: ['+50 Max HP', '+15% Damage', 'Full Heal'],
           });
         }
         
@@ -744,6 +749,7 @@ export function createProjectile(player, spell, targetX, targetY, targetPlayerId
     canHitPlayers: canPvP || (spell.canHitPlayers && player.pvpEnabled === true) || false,
     piercing: spell.piercing || false,
     inDungeon: player.inDungeon || false,
+    projectileShape: player.projectileShape || null,
   };
   
   if (proj.homing) {

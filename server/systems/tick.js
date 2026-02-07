@@ -92,6 +92,10 @@ export function gameTick() {
       if (player.speedBoostUntil && player.speedBoostUntil > Date.now()) {
         speedMult *= (player.speedBoostMultiplier || 1);
       }
+      // Fountain speed boost (2x for 10s after leaving fountain)
+      if (player.fountainSpeedBoostUntil && player.fountainSpeedBoostUntil > Date.now() && !player.inFountain) {
+        speedMult *= 2.0;
+      }
       const SPEED_CAP = 350; // Max effective speed
       const speed = Math.min(baseSpeed * speedMult, player.isAdmin ? 999 : SPEED_CAP);
       
@@ -343,7 +347,12 @@ export function gameTick() {
             }
 
             if (target) {
-              createProjectile(player, spell, target.x, target.y, targetIsPlayer ? target.id : null);
+              const projId = createProjectile(player, spell, target.x, target.y, targetIsPlayer ? target.id : null);
+              // Auto-attack penalty: 50% damage
+              if (projId) {
+                const proj = gameState.projectiles.get(projId);
+                if (proj) proj.damage = Math.floor(proj.damage * 0.5);
+              }
               player.lastCast = player.lastCast || {};
               player.lastCast[spellId] = now;
               player.state = 'attack';
@@ -370,9 +379,21 @@ export function gameTick() {
       const healAmount = inFountain ? (fountain.healRate + 20) : 20;
       player.health = Math.min(player.health + healAmount * dt, player.maxHealth);
       player.isHealing = true;
+      
+      // Track fountain state for speed boost on exit
+      const wasInFountain = player.inFountain;
       player.inFountain = inFountain;
+      
+      // Player just left fountain proximity → grant 2x speed boost for 10s
+      if (wasInFountain && !inFountain) {
+        player.fountainSpeedBoostUntil = now + 10000;
+      }
     } else {
       player.isHealing = false;
+      // Check if player was in fountain and just left sanctuary entirely
+      if (player.inFountain) {
+        player.fountainSpeedBoostUntil = now + 10000;
+      }
       player.inFountain = false;
     }
   }
@@ -1367,7 +1388,7 @@ export function gameTick() {
     if (!zone || zone.isSafe) continue;
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    const targetForZone = Math.max(50, playerCount * 35);
+    const targetForZone = Math.max(100, playerCount * 70);
     
     if (enemiesInZone < targetForZone) {
       // Spawn multiple enemies per tick when underpopulated
@@ -1387,7 +1408,7 @@ export function gameTick() {
     if (playersPerZone[zoneId]) continue; // Already handled
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    if (enemiesInZone < 30 && Math.random() < 0.25) {
+    if (enemiesInZone < 60 && Math.random() < 0.25) {
       spawnEnemyInZone(zoneId);
     }
   }
@@ -1597,6 +1618,7 @@ export function gameTick() {
         id: p.id, x: Math.round(p.x), y: Math.round(p.y),
         radius: p.radius, color: p.color, trailColor: p.trailColor,
         spellId: p.spellId, ownerClass: p.ownerClass, level: p.ownerLevel || 1,
+        projectileShape: p.projectileShape || null,
         vx: p.vx ? Math.round(p.vx) : undefined,
         vy: p.vy ? Math.round(p.vy) : undefined,
       }));
@@ -1690,6 +1712,9 @@ export function gameTick() {
         cooldowns: p.id === player.id ? cooldowns : {},
         emote: p.emote || null, emoteStart: p.emoteStart || null,
         isHealing: p.isHealing || false,
+        inFountain: p.inFountain || false,
+        fountainBoostRemaining: (p.id === player.id && p.fountainSpeedBoostUntil && p.fountainSpeedBoostUntil > now && !p.inFountain) 
+          ? Math.ceil((p.fountainSpeedBoostUntil - now) / 1000) : 0,
         bossKills: p.bossKills || {},
         upgrades: p.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
         inDungeon: p.inDungeon || false,
@@ -1703,6 +1728,9 @@ export function gameTick() {
         customSecondaryColor: p.isCustomWizard ? p.secondaryColor : undefined,
         customClassName: p.isCustomWizard ? p.className : undefined,
         customIconStyle: p.isCustomWizard ? (p.iconStyle || 'star') : undefined,
+        customBodyStyle: p.isCustomWizard ? (p.bodyStyle || 'wizard') : undefined,
+        customProjectileShape: p.isCustomWizard ? (p.projectileShape || 'orb') : undefined,
+        customHeadgear: p.isCustomWizard ? (p.headgear || 'pointyHat') : undefined,
       })),
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,

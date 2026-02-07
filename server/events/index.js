@@ -23,7 +23,8 @@ io.on('connection', (socket) => {
   socket.emit('classes', CLASSES);
 
   // Pre-join admin authentication (so wizard creator works from title screen)
-  socket.on('authenticateAdmin', async ({ sessionToken }) => {
+  socket.on('authenticateAdmin', async (data) => {
+    const { sessionToken } = data || {};
     console.log(`🔑 authenticateAdmin attempt from ${socket.id}, token: ${sessionToken ? 'present' : 'missing'}`);
     if (!sessionToken || !sessionsDb[sessionToken]) {
       console.log(`🔑 authenticateAdmin failed: ${!sessionToken ? 'no token' : 'token not in sessionsDb'}`);
@@ -48,7 +49,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('join', async ({ playerId, playerName, playerClass, selectedSkin, adminKey, sessionToken, isCustomWizard }) => {
+  socket.on('join', async (data) => {
+    const { playerId, playerName, playerClass, selectedSkin, adminKey, sessionToken, isCustomWizard, startLevel } = data || {};
     // Prevent double-join from same socket
     for (const p of gameState.players.values()) {
       if (p.socketId === socket.id) {
@@ -144,7 +146,12 @@ io.on('connection', (socket) => {
 
     const id = saved?.id || uuidv4();
     const totalXp = saved?.totalXp || 0;
-    const level = saved?.level || 1;
+    let level = saved?.level || 1;
+    
+    // Admin can start at a higher level (e.g. 30 for testing)
+    if (isAdmin && startLevel && startLevel > level) {
+      level = Math.min(startLevel, 50);
+    }
     
     // Calculate stats based on level
     const healthBonus = (level - 1) * 12;
@@ -208,7 +215,10 @@ io.on('connection', (socket) => {
       player.className = classData.name;
       player.color = classData.color;
       player.secondaryColor = classData.secondaryColor || classData.color;
-      player.iconStyle = classData.iconStyle || 'star';
+      player.iconStyle = classData.iconStyle || saved?.customIconStyle || 'star';
+      player.bodyStyle = classData.bodyStyle || saved?.customBodyStyle || 'wizard';
+      player.projectileShape = classData.projectileShape || saved?.customProjectileShape || 'orb';
+      player.headgear = classData.headgear || saved?.customHeadgear || 'pointyHat';
       player.spells = classData.spells;
       player.dashAbility = classData.dashAbility;
       player.ultimateAbility = classData.ultimateAbility;
@@ -336,6 +346,9 @@ io.on('connection', (socket) => {
         customSecondaryColor: player.isCustomWizard ? (player.secondaryColor || player.color) : undefined,
         customClassName: player.isCustomWizard ? player.className : undefined,
         customIconStyle: player.isCustomWizard ? (player.iconStyle || 'star') : undefined,
+        customBodyStyle: player.isCustomWizard ? (player.bodyStyle || 'wizard') : undefined,
+        customProjectileShape: player.isCustomWizard ? (player.projectileShape || 'orb') : undefined,
+        customHeadgear: player.isCustomWizard ? (player.headgear || 'pointyHat') : undefined,
       },
       world: WORLD,
       zones: ZONES,
@@ -381,7 +394,8 @@ io.on('connection', (socket) => {
   });
   
   // Click to move
-  socket.on('clickMove', ({ targetX, targetY }) => {
+  socket.on('clickMove', (data) => {
+    const { targetX, targetY } = data || {};
     if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
     
     for (const player of gameState.players.values()) {
@@ -425,7 +439,8 @@ io.on('connection', (socket) => {
   });
 
   // Dash ability (spacebar)
-  socket.on('dash', ({ targetX, targetY }) => {
+  socket.on('dash', (data) => {
+    const { targetX, targetY } = data || {};
     // Validate coordinates
     const tx = Number.isFinite(targetX) ? targetX : null;
     const ty = Number.isFinite(targetY) ? targetY : null;
@@ -580,7 +595,8 @@ io.on('connection', (socket) => {
   });
 
   // Ultimate ability (Q key)
-  socket.on('ultimate', ({ targetX, targetY }) => {
+  socket.on('ultimate', (data) => {
+    const { targetX, targetY } = data || {};
     // Validate coordinates
     const tx = Number.isFinite(targetX) ? targetX : null;
     const ty = Number.isFinite(targetY) ? targetY : null;
@@ -932,7 +948,8 @@ io.on('connection', (socket) => {
   });
 
   // Portal interaction (supports both sanctuary->zone and zone->sanctuary return portals)
-  socket.on('usePortal', ({ portalId }) => {
+  socket.on('usePortal', (data) => {
+    const { portalId } = data || {};
     const isReturn = portalId.endsWith('_return');
     const baseId = isReturn ? portalId.replace('_return', '') : portalId;
     const portal = PORTALS[baseId];
@@ -997,7 +1014,8 @@ io.on('connection', (socket) => {
   });
 
   // Change skin
-  socket.on('changeSkin', ({ skinId }) => {
+  socket.on('changeSkin', (data) => {
+    const { skinId } = data || {};
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
         const skin = SKINS[skinId];
@@ -1013,7 +1031,8 @@ io.on('connection', (socket) => {
   });
 
   // Buy upgrade from shop
-  socket.on('buyUpgrade', ({ type, buildingId }) => {
+  socket.on('buyUpgrade', (data) => {
+    const { type, buildingId } = data || {};
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
         // Building-to-upgrade mapping
@@ -1111,7 +1130,8 @@ io.on('connection', (socket) => {
   });
 
   // Emote
-  socket.on('emote', ({ type }) => {
+  socket.on('emote', (data) => {
+    const { type } = data || {};
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
         player.emote = type;
@@ -1136,6 +1156,43 @@ io.on('connection', (socket) => {
       if (player.socketId === socket.id) {
         player.autoAttack = player.autoAttack === false ? true : false;
         socket.emit('autoAttackToggled', { enabled: player.autoAttack !== false });
+        break;
+      }
+    }
+  });
+
+  // Manual attack (click-to-fire when auto-attack is off)
+  socket.on('manualAttack', (data) => {
+    const { targetX, targetY } = data || {};
+    if (typeof targetX !== 'number' || typeof targetY !== 'number') return;
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        if (player.health <= 0) break;
+        // Only works when auto-attack is OFF
+        if (player.autoAttack !== false) break;
+        
+        const classData = CLASSES[player.class];
+        const playerSpells = player.spells || (classData ? classData.spells : []);
+        if (!playerSpells || playerSpells.length === 0) break;
+        
+        const now = Date.now();
+        // Fire the first available spell (primary attack)
+        for (const spellId of playerSpells) {
+          const spell = SPELLS[spellId];
+          if (!spell) continue;
+          
+          const lastCast = player.lastCast?.[spellId] || 0;
+          const effectiveCooldown = spell.cooldown * (player.cooldownMultiplier || 1) * (player.attackSpeedMultiplier || 1);
+          if (now - lastCast >= effectiveCooldown) {
+            // Full damage for manual attacks (no penalty)
+            createProjectile(player, spell, targetX, targetY);
+            player.lastCast = player.lastCast || {};
+            player.lastCast[spellId] = now;
+            player.state = 'attack';
+            io.emit('sound', { type: 'spell', spellId, x: player.x, y: player.y });
+            break; // Only fire one spell per click
+          }
+        }
         break;
       }
     }
@@ -1172,7 +1229,8 @@ io.on('connection', (socket) => {
   });
 
   // Class Ability (hotkey 1, 2, 3)
-  socket.on('classAbility', ({ abilitySlot, targetX, targetY }) => {
+  socket.on('classAbility', (data) => {
+    const { abilitySlot, targetX, targetY } = data || {};
     const tx = Number.isFinite(targetX) ? targetX : null;
     const ty = Number.isFinite(targetY) ? targetY : null;
     const now = Date.now();
@@ -1781,7 +1839,22 @@ io.on('connection', (socket) => {
   });
 
   // NPC Interaction
-  socket.on('interactNpc', ({ npcId }) => {
+  // Accept quest from quest master
+  socket.on('acceptQuest', (data) => {
+    const { questId } = data || {};
+    for (const player of gameState.players.values()) {
+      if (player.socketId !== socket.id) continue;
+      if (questId === 'conquer_realm') {
+        player.questActive = true;
+        socket.emit('questAccepted', { questId: 'conquer_realm', name: 'Champion of the Realm' });
+        console.log(`📜 ${player.name} accepted quest: Champion of the Realm`);
+      }
+      break;
+    }
+  });
+
+  socket.on('interactNpc', (data) => {
+    const { npcId } = data || {};
     for (const player of gameState.players.values()) {
       if (player.socketId === socket.id) {
         const npc = gameState.npcs.get(npcId);
@@ -1982,7 +2055,8 @@ io.on('connection', (socket) => {
   // ===========================================
 
   // Create a custom dungeon via prompt (admin = LLM, others = procedural)
-  socket.on('createCustomDungeon', async ({ prompt }) => {
+  socket.on('createCustomDungeon', async (data) => {
+    const { prompt } = data || {};
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
       socket.emit('customDungeonError', { message: 'Please describe your dungeon idea (at least 3 characters).' });
       return;
@@ -2036,7 +2110,8 @@ io.on('connection', (socket) => {
   // Rate limit tracking for wizard generation
   const wizardRateLimits = {};
   
-  socket.on('generateWizard', async ({ prompt, sessionToken, quality }) => {
+  socket.on('generateWizard', async (data) => {
+    const { prompt, sessionToken, quality } = data || {};
     // Validate quality parameter
     const modelQuality = quality === 'standard' ? 'standard' : 'premium';
     // Check admin status (for "Play as" feature later)
@@ -2116,7 +2191,8 @@ io.on('connection', (socket) => {
   });
 
   // Select a custom AI wizard class for current character
-  socket.on('selectCustomWizard', async ({ classId, sessionToken }) => {
+  socket.on('selectCustomWizard', async (data) => {
+    const { classId, sessionToken } = data || {};
     console.log(`🧙 selectCustomWizard received: classId=${classId}, socketId=${socket.id}`);
     const player = getPlayerBySocket(socket.id);
     if (!player) {
@@ -2170,7 +2246,8 @@ io.on('connection', (socket) => {
   });
 
   // Enter a custom dungeon
-  socket.on('enterCustomDungeon', ({ dungeonId }) => {
+  socket.on('enterCustomDungeon', (data) => {
+    const { dungeonId } = data || {};
     const config = gameState.customDungeons.get(dungeonId);
     if (!config) {
       socket.emit('customDungeonError', { message: 'Dungeon not found.' });
@@ -2218,7 +2295,8 @@ io.on('connection', (socket) => {
   });
 
   // Get player data (for character select)
-  socket.on('getPlayerData', async ({ playerId, playerName, sessionToken }) => {
+  socket.on('getPlayerData', async (data) => {
+    const { playerId, playerName, sessionToken } = data || {};
     let saved = playerId ? await loadPlayerFromDb(playerId) : null;
     
     // OWNERSHIP CHECK: Only return character data if caller owns it
