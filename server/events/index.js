@@ -102,37 +102,8 @@ io.on('connection', (socket) => {
     if (saved) {
       validatedClass = saved.class;
     } else {
-      // Brute requires admin (new character only)
-      if (playerClass === 'brute') {
-        if (!isAdmin) {
-          validatedClass = 'pyromancer';
-          console.log(`${playerName} tried to pick Brute without admin`);
-        } else {
-          console.log(`Admin ${playerName} playing as The Brute`);
-        }
-      }
-      
-      // Shadow Archer & Voidlord require dragon kill (new character only)
-      if (playerClass === 'shadowarcher' || playerClass === 'voidlord') {
-        let hasDragonKill = false;
-        // Check user's other characters for dragon kill
-        if (sessionToken && sessionsDb[sessionToken]) {
-          const sess = sessionsDb[sessionToken];
-          if (!sess.isGuest && sess.userId) {
-            const usr = await loadUserFromDb(sess.userId);
-            if (usr?.characters) {
-              for (const cid of usr.characters) {
-                const c = await loadPlayerFromDb(cid);
-                if (c?.bossKills?.dragon) { hasDragonKill = true; break; }
-              }
-            }
-          }
-        }
-        if (!hasDragonKill && !isAdmin) {
-          validatedClass = 'pyromancer';
-          console.log(`${playerName} tried to pick ${playerClass} without dragon kill`);
-        }
-      }
+      // All classes are now available to everyone
+      // (Brute, Shadow Archer, Void Lord no longer restricted)
     }
     
     // Handle custom wizard classes
@@ -265,6 +236,7 @@ io.on('connection', (socket) => {
       voidlord: { 1: 'voidRiftAbility', 2: 'soulDrain', 3: 'apocalypse' },
       shadowarcher: { 1: 'huntersMark', 2: 'multishot', 3: 'deathArrow' },
       brute: { 1: 'proteinShake', 2: 'barbellSpin', 3: 'ultimateFlex' },
+      swordsman: { 1: 'riposte', 2: 'executionersStrike', 3: 'bladestorm' },
     };
     
     const enhancedClasses = {};
@@ -547,6 +519,39 @@ io.on('connection', (socket) => {
           spawnParticles(startX, startY, dashColor, 10);
           spawnParticles(player.x, player.y, dashColor, 10);
           io.emit('explosion', { x: player.x, y: player.y, radius: dash.damageRadius, color: dashColor });
+        } else if (dash.id === 'shoulderCharge') {
+          // Shoulder Charge - invulnerable charge that damages on arrival AND along the path
+          if (dash.invulnerable) player.invulnerableUntil = now + 400;
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+            // Damage along the dash line
+            const distToLine = pointToLineDistance(enemy, { x: startX, y: startY }, { x: player.x, y: player.y });
+            if (distToLine < 50) {
+              enemy.health -= dash.damageOnArrival;
+              spawnDamageNumber(enemy.x, enemy.y - 20, dash.damageOnArrival);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          io.emit('dashTrail', { startX, startY, endX: player.x, endY: player.y, color: '#fbbf24' });
+          spawnParticles(startX, startY, '#b45309', 8);
+          spawnParticles(player.x, player.y, '#fbbf24', 12);
+          io.emit('explosion', { x: player.x, y: player.y, radius: dash.damageRadius || 70, color: '#fbbf24' });
+        } else if (dash.id === 'bladeRush') {
+          // Blade Rush - slash along the dash path
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+            const distToLine = pointToLineDistance(enemy, { x: startX, y: startY }, { x: player.x, y: player.y });
+            if (distToLine < 45) {
+              enemy.health -= dash.damage || 20;
+              spawnDamageNumber(enemy.x, enemy.y - 20, dash.damage || 20);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          io.emit('dashTrail', { startX, startY, endX: player.x, endY: player.y, color: '#c0c0c0' });
+          spawnParticles(startX, startY, '#708090', 6);
+          spawnParticles(player.x, player.y, '#c0c0c0', 8);
         } else if (dash.id && dash.id.startsWith('custom_')) {
           // Generic custom wizard dash - trail damage + arrival particles
           const cwDashColor = player.color || '#a78bfa';
@@ -809,6 +814,51 @@ io.on('connection', (socket) => {
           }, ult.duration / ult.waves);
           
           io.emit('sound', { type: 'arrowStorm', x: stormX, y: stormY });
+        
+        } else if (ult.id === 'gainsMode') {
+          // GAINS MODE - immediate AOE damage + speed/damage buff
+          const gainsDmg = Math.floor(ult.damage * (player.damageMultiplier || 1));
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < ult.radius) {
+              enemy.health -= gainsDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 20, gainsDmg);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          // Buff: speed + damage boost for duration
+          player.speedBoostUntil = now + (ult.duration || 5000);
+          player.speedBoostMultiplier = 1.4;
+          player.damageBoostUntil = now + (ult.duration || 5000);
+          player.savedDamageMultiplier = player.damageMultiplier || 1;
+          player.damageMultiplier = (player.damageMultiplier || 1) * 1.5;
+          // Restore after duration
+          setTimeout(() => {
+            if (player.damageBoostUntil && Date.now() >= player.damageBoostUntil) {
+              player.damageMultiplier = player.savedDamageMultiplier || 1;
+            }
+          }, ult.duration || 5000);
+          io.emit('gainsMode', { playerId: player.id, x: player.x, y: player.y, radius: ult.radius, duration: ult.duration });
+          spawnParticles(player.x, player.y, '#fbbf24', 40);
+          io.emit('sound', { type: 'gainsMode', x: player.x, y: player.y });
+        
+        } else if (ult.id === 'whirlwindSlash') {
+          // Whirlwind Slash - instant spinning blade AOE
+          const whirlDmg = Math.floor(ult.damage * (player.damageMultiplier || 1));
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (ultPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < ult.radius) {
+              enemy.health -= whirlDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 20, whirlDmg);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          io.emit('whirlwindSlash', { playerId: player.id, x: player.x, y: player.y, radius: ult.radius });
+          spawnParticles(player.x, player.y, '#c0c0c0', 35);
+          io.emit('sound', { type: 'whirlwindSlash', x: player.x, y: player.y });
+
         } else {
           // Custom wizard ultimate - unique AOE burst with the wizard's own color/style
           const explosionX = tx ?? player.x;
@@ -1138,6 +1188,8 @@ io.on('connection', (socket) => {
         stormcaller: { 1: 'staticField', 2: 'ballLightning', 3: 'thunderGod' },
         voidlord: { 1: 'voidRiftAbility', 2: 'soulDrain', 3: 'apocalypse' },
         shadowarcher: { 1: 'huntersMark', 2: 'multishot', 3: 'deathArrow' },
+        brute: { 1: 'proteinShake', 2: 'barbellSpin', 3: 'ultimateFlex' },
+        swordsman: { 1: 'riposte', 2: 'executionersStrike', 3: 'bladestorm' },
       };
       
       const levelReqs = { 1: 10, 2: 20, 3: 30 };
@@ -1599,6 +1651,99 @@ io.on('connection', (socket) => {
         });
         spawnParticles(player.x, player.y, '#000', 10);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      
+      // === BRUTE ABILITIES ===
+      } else if (abilityId === 'proteinShake') {
+        // Protein Shake - heal 30% HP and speed boost
+        const healAmount = Math.floor(player.maxHealth * 0.3);
+        player.health = Math.min(player.maxHealth, player.health + healAmount);
+        player.speedBoostUntil = now + 4000;
+        player.speedBoostMultiplier = 1.35;
+        spawnDamageNumber(player.x, player.y - 20, healAmount, false, '#22c55e');
+        io.emit('proteinShake', { playerId: player.id, x: player.x, y: player.y, heal: healAmount });
+        spawnParticles(player.x, player.y, '#fbbf24', 12);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'barbellSpin') {
+        // Barbell Spin - AOE around player
+        const spinDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= spinDmg;
+            spawnDamageNumber(enemy.x, enemy.y - 10, spinDmg);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('barbellSpin', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#b45309', 25);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'ultimateFlex') {
+        // Ultimate Flex - massive AOE shockwave
+        const flexDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= flexDmg;
+            spawnDamageNumber(enemy.x, enemy.y - 20, flexDmg);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('ultimateFlex', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#fbbf24', 50);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      
+      // === SWORDSMAN ABILITIES ===
+      } else if (abilityId === 'riposte') {
+        // Riposte - brief invulnerability then strike
+        player.invulnerableUntil = now + 800;
+        setTimeout(() => {
+          const riposteDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < spell.radius) {
+              enemy.health -= riposteDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 10, riposteDmg);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          io.emit('riposte', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
+          spawnParticles(player.x, player.y, '#c0c0c0', 15);
+        }, 400);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'executionersStrike') {
+        // Executioner's Strike - heavy cleave
+        const execDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= execDmg;
+            spawnDamageNumber(enemy.x, enemy.y - 15, execDmg);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('executionersStrike', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#708090', 20);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+      } else if (abilityId === 'bladestorm') {
+        // Bladestorm - massive whirlwind of steel
+        const stormDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        for (const enemy of gameState.enemies.values()) {
+          if (enemy.health <= 0) continue;
+          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+          if (distance(enemy, player) < spell.radius) {
+            enemy.health -= stormDmg;
+            spawnDamageNumber(enemy.x, enemy.y - 20, stormDmg);
+            checkEnemyDeath(enemy, player.id);
+          }
+        }
+        io.emit('bladestorm', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
+        spawnParticles(player.x, player.y, '#c0c0c0', 45);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+
       } else if (spell.type === 'classAbility') {
         // Generic custom wizard ability - AOE damage burst
         const abilityDmg = spell.damage * (player.damageMultiplier || 1);

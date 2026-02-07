@@ -87,7 +87,11 @@ export function gameTick() {
       const move = normalize({ x: dx, y: dy });
       // Use player's stored baseSpeed (includes level bonus) and apply speedMultiplier from upgrades
       const baseSpeed = player.baseSpeed || CLASSES[player.class]?.baseSpeed || 150;
-      const speedMult = player.speedMultiplier || 1;
+      let speedMult = player.speedMultiplier || 1;
+      // Temporary speed boost (e.g. Protein Shake)
+      if (player.speedBoostUntil && player.speedBoostUntil > Date.now()) {
+        speedMult *= (player.speedBoostMultiplier || 1);
+      }
       const SPEED_CAP = 350; // Max effective speed
       const speed = Math.min(baseSpeed * speedMult, player.isAdmin ? 999 : SPEED_CAP);
       

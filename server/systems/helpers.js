@@ -97,7 +97,7 @@ export function spawnXpOrb(x, y, amount) {
 // ===========================================
 // DAMAGE NUMBERS
 // ===========================================
-export function spawnDamageNumber(x, y, amount, isCrit = false) {
+export function spawnDamageNumber(x, y, amount, isCrit = false, color = null) {
   // Limit damage numbers to prevent lag
   if (gameState.damageNumbers.length > 50) {
     gameState.damageNumbers.shift(); // Remove oldest
@@ -108,6 +108,7 @@ export function spawnDamageNumber(x, y, amount, isCrit = false) {
     y,
     amount: Math.round(amount),
     isCrit,
+    color, // Optional override color (e.g. green for heals)
     createdAt: Date.now(),
     lifetime: 800, // Reduced from 1000
   });

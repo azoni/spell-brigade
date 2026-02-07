@@ -69,8 +69,12 @@ async function callAnthropic(systemPrompt, userPrompt, maxTokens, quality = 'pre
 }
 
 async function callOpenRouter(systemPrompt, userPrompt, maxTokens, quality = 'premium') {
-  const model = quality === 'standard' ? 'anthropic/claude-haiku-4-5-20251001' : 'anthropic/claude-sonnet-4-20250514';
-  console.log(`🤖 Calling OpenRouter API (${quality === 'standard' ? 'Haiku - Standard' : 'Sonnet - Premium'})...`);
+  // OpenRouter uses different model identifiers than Anthropic direct API
+  // Allow env override: OPENROUTER_MODEL_STANDARD / OPENROUTER_MODEL_PREMIUM
+  const model = quality === 'standard'
+    ? (process.env.OPENROUTER_MODEL_STANDARD || 'anthropic/claude-3.5-haiku')
+    : (process.env.OPENROUTER_MODEL_PREMIUM || 'anthropic/claude-sonnet-4');
+  console.log(`🤖 Calling OpenRouter API (${model})...`);
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
