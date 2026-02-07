@@ -369,18 +369,22 @@ export function gameTick() {
     const playerZone = getZoneAtPosition(player.x, player.y);
     const inSanctuary = playerZone?.id === 'sanctuary';
     
-    if (inSanctuary && player.health < player.maxHealth) {
+    if (inSanctuary) {
       // Check if player is in healing fountain (center of sanctuary)
       const fountain = BUILDINGS.healing_fountain;
       const distToFountain = distance(player, { x: fountain.x, y: fountain.y });
       const inFountain = distToFountain < fountain.healingRadius;
       
-      // Base heal: 20 HP/s, Fountain: 35 HP/s (fountain.healRate + base)
-      const healAmount = inFountain ? (fountain.healRate + 20) : 20;
-      player.health = Math.min(player.health + healAmount * dt, player.maxHealth);
-      player.isHealing = true;
+      // Heal if below max HP
+      if (player.health < player.maxHealth) {
+        const healAmount = inFountain ? (fountain.healRate + 20) : 20;
+        player.health = Math.min(player.health + healAmount * dt, player.maxHealth);
+        player.isHealing = true;
+      } else {
+        player.isHealing = false;
+      }
       
-      // Track fountain state for speed boost on exit
+      // Track fountain state for speed boost on exit (works even at full HP)
       const wasInFountain = player.inFountain;
       player.inFountain = inFountain;
       

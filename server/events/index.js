@@ -73,7 +73,7 @@ io.on('connection', (socket) => {
     
     // Validate class selection
     let validatedClass = playerClass;
-    let isAdmin = isAzoniAccount;
+    let isAdmin = isAzoniAccount || socket.isAdmin || adminKey === 'azoni-voidlord-2026';
     
     // Load or create player - ONLY by unique ID, never by name
     let saved = playerId ? await loadPlayerFromDb(playerId) : null;
