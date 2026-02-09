@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { llmGenerate, isLLMEnabled } from './openrouter.js';
+import { logActivity } from './activity-logger.js';
 
 // ===========================================
 // AI WIZARD GENERATOR - Claude-powered class creation
@@ -378,7 +379,7 @@ function clampWizardOutput(data) {
 export async function generateWizard(prompt, quality = 'premium') {
   if (isLLMEnabled()) {
     console.log(`🧙 Generating wizard via LLM (${quality}): "${prompt}"`);
-    const llmData = await llmGenerate(
+    const { result: llmData, usage } = await llmGenerate(
       WIZARD_SYSTEM_PROMPT,
       `Create a wizard class based on this player concept:\n\n"${prompt}"\n\nRespond with ONLY the JSON. No markdown fences, no explanation.`,
       1500,
@@ -389,6 +390,18 @@ export async function generateWizard(prompt, quality = 'premium') {
       const result = clampWizardOutput(llmData);
       result.generatedBy = 'ai';
       result.modelUsed = quality;
+
+      // Log to portfolio activity feed
+      logActivity({
+        type: 'wizard_created',
+        title: `AI Wizard: ${result.classDef.name}`,
+        description: result.classDef.description || `Custom wizard from "${prompt}"`,
+        model: usage?.model || 'claude-sonnet-4',
+        tokens: usage ? { prompt: usage.promptTokens, completion: usage.completionTokens, total: usage.totalTokens } : undefined,
+        cost: usage?.cost,
+        metadata: { wizardName: result.classDef.name, prompt: prompt.slice(0, 200), quality },
+      });
+
       return result;
     }
     console.warn('LLM generation failed, falling back to templates');

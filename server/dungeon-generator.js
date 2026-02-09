@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { llmGenerate, isLLMEnabled } from './openrouter.js';
+import { logActivity } from './activity-logger.js';
 
 // ===========================================
 // DUNGEON GENERATOR - Procedural + LLM hybrid
@@ -346,16 +347,30 @@ export async function generateDungeonLLM(prompt, creatorName, playerId) {
   createCooldowns.set(playerId, now);
 
   let dungeonData = null;
+  let llmUsage = null;
 
   if (isLLMEnabled()) {
     console.log(`🤖 Generating dungeon via LLM for: "${prompt}"`);
-    dungeonData = await llmGenerate(DUNGEON_LLM_PROMPT, prompt, 800);
+    const { result, usage } = await llmGenerate(DUNGEON_LLM_PROMPT, prompt, 800);
+    dungeonData = result;
+    llmUsage = usage;
   }
 
   if (dungeonData) {
     // LLM succeeded - clamp & build
     const clamped = clampDungeonLLMOutput(dungeonData);
     const layout = computeLayout(clamped.rooms, clamped.boss);
+
+    // Log to portfolio activity feed
+    logActivity({
+      type: 'dungeon_created',
+      title: `AI Dungeon: ${clamped.name}`,
+      description: clamped.description || `Custom dungeon from "${prompt}"`,
+      model: llmUsage?.model || 'claude-sonnet-4',
+      tokens: llmUsage ? { prompt: llmUsage.promptTokens, completion: llmUsage.completionTokens, total: llmUsage.totalTokens } : undefined,
+      cost: llmUsage?.cost,
+      metadata: { dungeonName: clamped.name, prompt: prompt.slice(0, 200), rooms: clamped.rooms.length },
+    });
 
     return {
       id: uuidv4(), name: clamped.name,

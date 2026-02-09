@@ -1,8 +1,17 @@
 // ===========================================
 // LLM API - Supports Anthropic direct + OpenRouter fallback
+// Returns { result, usage } where usage has token/cost info
 // ===========================================
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY || '';
+
+// Cost per 1M tokens (input/output)
+const MODEL_COSTS = {
+  'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
+  'anthropic/claude-sonnet-4': { input: 3.00, output: 15.00 },
+  'anthropic/claude-3.5-haiku': { input: 1.00, output: 5.00 },
+};
 
 function isAnthropicKey() {
   return API_KEY.startsWith('sk-ant-');
@@ -12,15 +21,24 @@ export function isLLMEnabled() {
   return !!API_KEY;
 }
 
+function estimateCost(model, inputTokens, outputTokens) {
+  const rates = MODEL_COSTS[model] || { input: 3.00, output: 15.00 };
+  return (inputTokens / 1e6) * rates.input + (outputTokens / 1e6) * rates.output;
+}
+
 /**
  * Call LLM with a system + user prompt, expect JSON back.
  * Auto-detects Anthropic vs OpenRouter from key format.
  * quality: 'standard' = Haiku (fast), 'premium' = Sonnet (higher quality)
+ * 
+ * Returns { result, usage } or { result: null, usage: null } on failure.
+ *   result = parsed JSON object
+ *   usage = { model, promptTokens, completionTokens, totalTokens, cost }
  */
 export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500, quality = 'premium') {
   if (!API_KEY) {
     console.warn('⚠️ No API key set (ANTHROPIC_API_KEY or OPENROUTER_API_KEY), LLM disabled');
-    return null;
+    return { result: null, usage: null };
   }
 
   try {
@@ -31,7 +49,7 @@ export async function llmGenerate(systemPrompt, userPrompt, maxTokens = 1500, qu
     }
   } catch (err) {
     console.error('LLM call failed:', err.message);
-    return null;
+    return { result: null, usage: null };
   }
 }
 
@@ -56,21 +74,35 @@ async function callAnthropic(systemPrompt, userPrompt, maxTokens, quality = 'pre
   if (!res.ok) {
     const errText = await res.text();
     console.error(`Anthropic API error ${res.status}: ${errText}`);
-    return null;
+    return { result: null, usage: null };
   }
 
   const data = await res.json();
   const content = data.content?.[0]?.text;
-  if (!content) return null;
+  if (!content) return { result: null, usage: null };
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-  return JSON.parse(jsonMatch[0]);
+  if (!jsonMatch) return { result: null, usage: null };
+
+  const result = JSON.parse(jsonMatch[0]);
+
+  // Anthropic returns usage as input_tokens / output_tokens
+  const inputTokens = data.usage?.input_tokens || 0;
+  const outputTokens = data.usage?.output_tokens || 0;
+
+  return {
+    result,
+    usage: {
+      model,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      cost: estimateCost(model, inputTokens, outputTokens),
+    },
+  };
 }
 
 async function callOpenRouter(systemPrompt, userPrompt, maxTokens, quality = 'premium') {
-  // OpenRouter uses different model identifiers than Anthropic direct API
-  // Allow env override: OPENROUTER_MODEL_STANDARD / OPENROUTER_MODEL_PREMIUM
   const model = quality === 'standard'
     ? (process.env.OPENROUTER_MODEL_STANDARD || 'anthropic/claude-3.5-haiku')
     : (process.env.OPENROUTER_MODEL_PREMIUM || 'anthropic/claude-sonnet-4');
@@ -98,13 +130,28 @@ async function callOpenRouter(systemPrompt, userPrompt, maxTokens, quality = 'pr
   if (!res.ok) {
     const errText = await res.text();
     console.error(`OpenRouter API error ${res.status}: ${errText}`);
-    return null;
+    return { result: null, usage: null };
   }
 
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
-  if (!content) return null;
+  if (!content) return { result: null, usage: null };
 
   const cleaned = content.replace(/```json\s*|```\s*/g, '').trim();
-  return JSON.parse(cleaned);
+  const result = JSON.parse(cleaned);
+
+  // OpenRouter returns usage as prompt_tokens / completion_tokens
+  const inputTokens = data.usage?.prompt_tokens || 0;
+  const outputTokens = data.usage?.completion_tokens || 0;
+
+  return {
+    result,
+    usage: {
+      model,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      cost: estimateCost(model, inputTokens, outputTokens),
+    },
+  };
 }
