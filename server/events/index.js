@@ -145,12 +145,21 @@ io.on('connection', (socket) => {
     }
 
     const id = saved?.id || uuidv4();
-    const totalXp = saved?.totalXp || 0;
+    let totalXp = saved?.totalXp || 0;
     let level = saved?.level || 1;
     
     // Admin can start at a higher level (e.g. 30 for testing)
     if (isAdmin && startLevel && startLevel > level) {
+      const oldLevel = level;
       level = Math.min(startLevel, 50);
+      // Grant matching totalXp so progression doesn't break
+      if (totalXp < 1) {
+        let requiredXp = 0;
+        for (let l = oldLevel; l < level; l++) {
+          requiredXp += xpForLevel(l);
+        }
+        totalXp = requiredXp;
+      }
     }
     
     // Calculate stats based on level
@@ -341,6 +350,7 @@ io.on('connection', (socket) => {
         isAdmin: player.isAdmin || false,
         bossKills: player.bossKills,
         questComplete: player.questComplete,
+        questActive: player.questActive || false,
         isCustomWizard: player.isCustomWizard || false,
         customColor: player.isCustomWizard ? player.color : undefined,
         customSecondaryColor: player.isCustomWizard ? (player.secondaryColor || player.color) : undefined,
@@ -1297,7 +1307,7 @@ io.on('connection', (socket) => {
         // Flame Shield - damage aura around self
         player.flameShieldUntil = now + spell.duration;
         io.emit('flameShieldStart', { playerId: player.id, x: player.x, y: player.y, duration: spell.duration });
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
         // Pulse damage every 500ms
         const pulseInterval = setInterval(() => {
@@ -1323,7 +1333,7 @@ io.on('connection', (socket) => {
         const meteorX = tx ?? player.x;
         const meteorY = ty ?? player.y;
         io.emit('meteorWarning', { x: meteorX, y: meteorY, radius: spell.radius, delay: spell.delay, color: '#ff4500' });
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
         setTimeout(() => {
           const msDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
@@ -1356,7 +1366,7 @@ io.on('connection', (socket) => {
         }
         io.emit('inferno', { x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#ff0000', 40);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'frostNova') {
         // Frost Nova - freeze nearby enemies
@@ -1374,7 +1384,7 @@ io.on('connection', (socket) => {
         }
         io.emit('frostNova', { x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#00ffff', 25);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'iceLance') {
         // Ice Lance - piercing projectile
@@ -1403,14 +1413,14 @@ io.on('connection', (socket) => {
           distanceTraveled: 0,
         };
         gameState.projectiles.set(proj.id, proj);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'glacialStorm') {
         // Glacial Storm - large persistent blizzard
         const stormX = tx ?? player.x;
         const stormY = ty ?? player.y;
         io.emit('glacialStorm', { x: stormX, y: stormY, radius: spell.radius, duration: spell.duration });
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
         const stormEnd = now + spell.duration;
         const stormInterval = setInterval(() => {
@@ -1441,7 +1451,7 @@ io.on('connection', (socket) => {
         player.x = newX;
         player.y = newY;
         spawnParticles(newX, newY, '#9b5de5', 15);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'arcaneBarrage') {
         // Arcane Barrage - multiple homing missiles
@@ -1473,7 +1483,7 @@ io.on('connection', (socket) => {
             gameState.projectiles.set(proj.id, proj);
           }, i * 100);
         }
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'timeWarp') {
         // Time Warp - speed and cooldown buff
@@ -1481,7 +1491,7 @@ io.on('connection', (socket) => {
         player.speedMultiplier = spell.speedBoost;
         player.cooldownMultiplier = spell.cooldownReduction;
         io.emit('timeWarp', { playerId: player.id, duration: spell.duration });
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
         setTimeout(() => {
           player.speedMultiplier = 1;
@@ -1503,7 +1513,7 @@ io.on('connection', (socket) => {
         }
         io.emit('staticField', { x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#ffff00', 20);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'ballLightning') {
         // Ball Lightning - slow powerful projectile
@@ -1531,7 +1541,7 @@ io.on('connection', (socket) => {
           distanceTraveled: 0,
         };
         gameState.projectiles.set(proj.id, proj);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'thunderGod') {
         // Thunder God - massive chain lightning
@@ -1572,14 +1582,14 @@ io.on('connection', (socket) => {
         io.emit('thunderGod', { x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#ffffff', 50);
         chainNext();
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'voidRiftAbility') {
         // Void Rift - persistent damage zone
         const riftX = tx ?? player.x;
         const riftY = ty ?? player.y;
         io.emit('voidRift', { x: riftX, y: riftY, radius: spell.radius, duration: spell.duration });
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
         const riftEnd = now + spell.duration;
         const riftInterval = setInterval(() => {
@@ -1622,7 +1632,7 @@ io.on('connection', (socket) => {
           distanceTraveled: 0,
         };
         gameState.projectiles.set(proj.id, proj);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'apocalypse') {
         // Apocalypse - massive void explosion
@@ -1636,7 +1646,7 @@ io.on('connection', (socket) => {
         }
         io.emit('apocalypse', { x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#8b00ff', 60);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'huntersMark') {
         // Hunter's Mark - fast piercing arrow
         const facing = player.facing || 'right';
@@ -1659,7 +1669,7 @@ io.on('connection', (socket) => {
           isArrow: true,
         });
         spawnParticles(player.x, player.y, '#dc2626', 6);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'multishot') {
         // Multishot - arrows in all directions
         const numArrows = 12;
@@ -1685,7 +1695,7 @@ io.on('connection', (socket) => {
         }
         io.emit('multishot', { x: player.x, y: player.y });
         spawnParticles(player.x, player.y, '#dc2626', 30);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'deathArrow') {
         // Death Arrow - devastating single shot
         const facing = player.facing || 'right';
@@ -1708,7 +1718,7 @@ io.on('connection', (socket) => {
           isArrow: true,
         });
         spawnParticles(player.x, player.y, '#000', 10);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       
       // === BRUTE ABILITIES ===
       } else if (abilityId === 'proteinShake') {
@@ -1720,7 +1730,7 @@ io.on('connection', (socket) => {
         spawnDamageNumber(player.x, player.y - 20, healAmount, false, '#22c55e');
         io.emit('proteinShake', { playerId: player.id, x: player.x, y: player.y, heal: healAmount });
         spawnParticles(player.x, player.y, '#fbbf24', 12);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'barbellSpin') {
         // Barbell Spin - AOE around player
         const spinDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
@@ -1735,7 +1745,7 @@ io.on('connection', (socket) => {
         }
         io.emit('barbellSpin', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#b45309', 25);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'ultimateFlex') {
         // Ultimate Flex - massive AOE shockwave
         const flexDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
@@ -1750,7 +1760,7 @@ io.on('connection', (socket) => {
         }
         io.emit('ultimateFlex', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#fbbf24', 50);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       
       // === SWORDSMAN ABILITIES ===
       } else if (abilityId === 'riposte') {
@@ -1770,7 +1780,7 @@ io.on('connection', (socket) => {
           io.emit('riposte', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
           spawnParticles(player.x, player.y, '#c0c0c0', 15);
         }, 400);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'executionersStrike') {
         // Executioner's Strike - heavy cleave
         const execDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
@@ -1785,7 +1795,7 @@ io.on('connection', (socket) => {
         }
         io.emit('executionersStrike', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#708090', 20);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'bladestorm') {
         // Bladestorm - massive whirlwind of steel
         const stormDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
@@ -1800,7 +1810,7 @@ io.on('connection', (socket) => {
         }
         io.emit('bladestorm', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#c0c0c0', 45);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
 
       } else if (spell.type === 'classAbility') {
         // Generic custom wizard ability - AOE damage burst
@@ -1831,7 +1841,7 @@ io.on('connection', (socket) => {
         });
         
         spawnParticles(player.x, player.y, spell.color || '#a78bfa', 15);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       }
       
       break;
@@ -1846,8 +1856,13 @@ io.on('connection', (socket) => {
       if (player.socketId !== socket.id) continue;
       if (questId === 'conquer_realm') {
         player.questActive = true;
-        socket.emit('questAccepted', { questId: 'conquer_realm', name: 'Champion of the Realm' });
-        console.log(`📜 ${player.name} accepted quest: Champion of the Realm`);
+        socket.emit('questAccepted', { 
+          questId: 'conquer_realm', 
+          name: 'Champion of the Realm',
+          bossKills: player.bossKills || {},
+          activateZoneQuests: true, // Tell client to activate all zone quests too
+        });
+        console.log(`📜 ${player.name} accepted quest: Champion of the Realm (+ all zone quests)`);
       }
       break;
     }

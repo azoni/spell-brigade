@@ -84,7 +84,7 @@ export const CLASSES = {
     },
   },
   
-  // === UNLOCKABLE CLASS - After Dragon Kill ===
+  // === Void Lord ===
   voidlord: {
     id: 'voidlord',
     name: 'Void Lord',
@@ -116,40 +116,40 @@ export const CLASSES = {
     },
   },
   
-  // === UNLOCKABLE CLASS - Shadow Archer (Unlocked after Dragon Kill) ===
+  // === Shadow Archer ===
   shadowarcher: {
     id: 'shadowarcher',
     name: 'Shadow Archer',
     color: '#334155',
     secondaryColor: '#dc2626',
     baseHealth: 75,
-    baseSpeed: 200,
+    baseSpeed: 165,
     spells: ['shadowArrow', 'piercingVolley'],
-    description: 'Deadly ranged hunter. Piercing arrows shred groups.',
+    description: 'Agile ranged hunter. Piercing arrows shred groups.',
     icon: '🏹',
     dashAbility: {
       id: 'shadowStep',
       name: 'Shadow Step',
       description: 'Vanish into shadow and reappear at target.',
-      cooldown: 5000,
-      distance: 220,
-      invulnerable: true,
-      damageOnArrival: 20,
-      damageRadius: 50,
+      cooldown: 6000,
+      distance: 180,
+      invulnerable: false,
+      damageOnArrival: 12,
+      damageRadius: 40,
     },
     ultimateAbility: {
       id: 'arrowStorm',
       name: 'Arrow Storm',
       description: 'Rain down a storm of shadow arrows over an area.',
-      cooldown: 22000,
-      damage: 70,
-      radius: 250,
+      cooldown: 25000,
+      damage: 45,
+      radius: 200,
       duration: 2000,
-      waves: 5,
+      waves: 4,
     },
   },
   
-  // === ADMIN CLASS - The Brute ===
+  // === The Brute ===
   brute: {
     id: 'brute',
     name: 'The Brute',

@@ -19,12 +19,12 @@ export function initEnemySystem(ioRef) {
 // Pre-populate the world with enemies so zones aren't empty on start
 export function populateWorld() {
   const zoneCounts = {
-    meadow: 140,
-    forest: 120,
-    volcanic: 100,
-    frozen: 100,
-    abyss: 90,
-    crystal_caves: 100,
+    meadow: 1120,
+    forest: 960,
+    volcanic: 800,
+    frozen: 800,
+    abyss: 720,
+    crystal_caves: 800,
   };
   let total = 0;
   for (const [zoneId, count] of Object.entries(zoneCounts)) {
@@ -130,8 +130,9 @@ export function spawnEnemy(forceType = null, position = null, levelBoost = 0, xp
   const template = ENEMY_TYPES[type];
   if (!template) return;
   
-  // Scale enemy stats by zone level
-  const scaleFactor = 1 + (levelBoost * 0.2);
+  // Scale enemy stats by zone level (exponential scaling for real zone difficulty)
+  // meadow(1): 1.8x, forest(2): 3.2x, volcanic(3): 5.8x, frozen(4): 10.5x, abyss(5): 18.9x
+  const scaleFactor = Math.pow(1.8, levelBoost);
   const xpMult = xpMultiplier || 1;
   
   const enemy = {
@@ -143,8 +144,8 @@ export function spawnEnemy(forceType = null, position = null, levelBoost = 0, xp
     health: Math.floor(template.health * scaleFactor),
     maxHealth: Math.floor(template.health * scaleFactor),
     damage: Math.floor(template.damage * scaleFactor),
-    speed: template.speed,
-    baseSpeed: template.speed,
+    speed: Math.floor(template.speed * (1 + levelBoost * 0.15)),
+    baseSpeed: Math.floor(template.speed * (1 + levelBoost * 0.15)),
     radius: template.radius,
     xp: Math.floor(template.xp * xpMult),
     color: template.color,
@@ -160,6 +161,7 @@ export function spawnEnemy(forceType = null, position = null, levelBoost = 0, xp
     resistant: template.resistant || [],
     isBoss: template.isBoss || false,
     zone: zone?.id,
+    aggroRange: 400 + (levelBoost * 50), // Higher zones = more aggressive chase range
   };
   
   gameState.enemies.set(id, enemy);
@@ -326,7 +328,25 @@ export function onBossDeath(enemy, killer) {
       if (!killer.bossKills) killer.bossKills = {};
       killer.bossKills[zoneId] = true;
       
-      const QUEST_BOSSES = ['meadow', 'forest', 'volcanic', 'frozen', 'abyss'];
+      // Send quest progress update to killer
+      const killerSocket = io.sockets.sockets.get(killer.socketId);
+      if (killerSocket) {
+        killerSocket.emit('questProgress', {
+          bossKills: { ...killer.bossKills },
+          zone: zoneId,
+        });
+        
+        // Zone quest bonus XP reward
+        const zoneQuestXp = { meadow: 500, forest: 1000, volcanic: 2000, frozen: 3000, crystal_caves: 2500, abyss: 4000 };
+        const bonusXp = zoneQuestXp[zoneId] || 0;
+        if (bonusXp > 0) {
+          killer.xp += bonusXp;
+          killer.totalXp += bonusXp;
+          killerSocket.emit('zoneQuestReward', { zone: zoneId, xp: bonusXp, bossName: enemy.name });
+        }
+      }
+      
+      const QUEST_BOSSES = ['meadow', 'forest', 'volcanic', 'frozen', 'crystal_caves', 'abyss'];
       const defeatedCount = QUEST_BOSSES.filter(z => killer.bossKills[z]).length;
       
       if (defeatedCount === QUEST_BOSSES.length && !killer.questComplete) {

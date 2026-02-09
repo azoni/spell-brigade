@@ -1034,7 +1034,7 @@ export function gameTick() {
       }
     }
     
-    if (nearestPlayer && nearestDist <= 400) {
+    if (nearestPlayer && nearestDist <= (enemy.aggroRange || 400)) {
       // Check if we would enter sanctuary buffer - don't chase into safe zone
       const playerTooClose = isTooCloseToSanctuary(nearestPlayer.x, nearestPlayer.y);
       
@@ -1392,7 +1392,7 @@ export function gameTick() {
     if (!zone || zone.isSafe) continue;
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    const targetForZone = Math.max(100, playerCount * 70);
+    const targetForZone = Math.max(200, playerCount * 140);
     
     if (enemiesInZone < targetForZone) {
       // Spawn multiple enemies per tick when underpopulated
@@ -1412,7 +1412,7 @@ export function gameTick() {
     if (playersPerZone[zoneId]) continue; // Already handled
     
     const enemiesInZone = [...gameState.enemies.values()].filter(e => e.health > 0 && e.zone === zoneId).length;
-    if (enemiesInZone < 60 && Math.random() < 0.25) {
+    if (enemiesInZone < 120 && Math.random() < 0.25) {
       spawnEnemyInZone(zoneId);
     }
   }
