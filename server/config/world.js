@@ -227,14 +227,21 @@ export function getRandomPointInZone(zoneId) {
     minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
     maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
   }
+  // Enemies spawn far from sanctuary so players can't snipe from safety
+  const SPAWN_SANCTUARY_BUFFER = 800;
   for (let i = 0; i < 100; i++) {
     const x = minX + Math.random() * (maxX - minX);
     const y = minY + Math.random() * (maxY - minY);
     if (pointInPolygon(x, y, zone.polygon)) {
-      if (zoneId !== 'sanctuary' && isTooCloseToSanctuary(x, y)) continue;
+      if (zoneId !== 'sanctuary') {
+        const dx = x - SANCTUARY_CENTER.x;
+        const dy = y - SANCTUARY_CENTER.y;
+        if (Math.sqrt(dx * dx + dy * dy) < (SANCTUARY_RADIUS + SPAWN_SANCTUARY_BUFFER)) continue;
+      }
       return { x, y };
     }
   }
+  // Fallback: zone centroid (always deep in zone)
   const cx = zone.polygon.reduce((s, p) => s + p.x, 0) / zone.polygon.length;
   const cy = zone.polygon.reduce((s, p) => s + p.y, 0) / zone.polygon.length;
   return { x: cx, y: cy };
