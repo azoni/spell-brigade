@@ -4,6 +4,8 @@ import { WORLD, ZONES, PORTALS, getRandomPointInZone } from '../config/world.js'
 import { CLASSES } from '../config/classes.js';
 import { SPELLS } from '../config/spells.js';
 import { SKINS, RANKS } from '../config/skins.js';
+import { HUNT_QUESTS, COLLECT_QUESTS } from '../config/npcs.js';
+import { respawnCollectible } from '../state.js';
 import {
   distance, normalize, clamp, xpForLevel, pointToLineDistance,
   getPlayerBySocket, isAdminSocket,
@@ -177,6 +179,8 @@ io.on('connection', (socket) => {
       ? selectedSkin 
       : (saved?.selectedSkin || `${classData.id}_default`);
     
+    const qb = saved?.questBonuses || { maxHealth: 0, speed: 0, damagePercent: 0, healBonus: 0, cooldownReduction: 0 };
+    
     const player = {
       id,
       socketId: socket.id,
@@ -194,15 +198,18 @@ io.on('connection', (socket) => {
       alternateSpells: saved?.alternateSpells || {}, // { slot: spellId }
       bossKills: saved?.bossKills || {}, // Track defeated zone bosses
       questComplete: saved?.questComplete || false,
+      activeQuests: saved?.activeQuests || [], // [{id, type, target/item, zone, required, progress}]
+      completedQuests: saved?.completedQuests || [], // [questId, ...]
+      questBonuses: saved?.questBonuses || { maxHealth: 0, speed: 0, damagePercent: 0, healBonus: 0, cooldownReduction: 0 },
       upgrades: saved?.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
       x: 10500, // Sanctuary center
       y: 9000,
-      health: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5,
-      maxHealth: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5,
-      baseSpeed: classData.baseSpeed + speedBonus,
-      damageMultiplier: damageMultiplier * Math.pow(1.01, saved?.upgrades?.damage || 0),
+      health: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5 + (qb.maxHealth || 0),
+      maxHealth: classData.baseHealth + healthBonus + (saved?.upgrades?.health || 0) * 5 + (qb.maxHealth || 0),
+      baseSpeed: classData.baseSpeed + speedBonus + (qb.speed || 0),
+      damageMultiplier: damageMultiplier * Math.pow(1.01, saved?.upgrades?.damage || 0) * (1 + (qb.damagePercent || 0) / 100),
       speedMultiplier: Math.pow(1.01, saved?.upgrades?.speed || 0),
-      cooldownMultiplier: Math.pow(0.99, saved?.upgrades?.cooldown || 0),
+      cooldownMultiplier: Math.pow(0.99, saved?.upgrades?.cooldown || 0) * (1 - (qb.cooldownReduction || 0) / 100),
       attackSpeedMultiplier: Math.pow(0.98, saved?.upgrades?.attackSpeed || 0), // 2% faster auto-attack per level
       input: { up: false, down: false, left: false, right: false },
       lastCast: {},
@@ -351,6 +358,9 @@ io.on('connection', (socket) => {
         bossKills: player.bossKills,
         questComplete: player.questComplete,
         questActive: player.questActive || false,
+        activeQuests: player.activeQuests || [],
+        completedQuests: player.completedQuests || [],
+        questBonuses: player.questBonuses || {},
         isCustomWizard: player.isCustomWizard || false,
         customColor: player.isCustomWizard ? player.color : undefined,
         customSecondaryColor: player.isCustomWizard ? (player.secondaryColor || player.color) : undefined,
@@ -1868,6 +1878,120 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Accept a hunt or collect quest
+  socket.on('acceptNpcQuest', (data) => {
+    const { questId } = data || {};
+    if (!questId) return;
+    
+    const player = getPlayerBySocket(socket.id);
+    if (!player) return;
+    
+    // Check if already active or completed
+    if (player.activeQuests.some(q => q.id === questId)) return;
+    if (player.completedQuests.includes(questId)) return;
+    
+    // Max 3 active quests at a time
+    if (player.activeQuests.length >= 3) {
+      socket.emit('questError', { message: 'You can only have 3 active quests. Complete or abandon one first.' });
+      return;
+    }
+    
+    // Find quest definition
+    const huntQuest = HUNT_QUESTS.find(q => q.id === questId);
+    const collectQuest = COLLECT_QUESTS.find(q => q.id === questId);
+    const questDef = huntQuest || collectQuest;
+    if (!questDef) return;
+    
+    const activeQuest = {
+      id: questDef.id,
+      name: questDef.name,
+      description: questDef.description,
+      type: huntQuest ? 'kill' : 'collect',
+      target: huntQuest?.target || collectQuest?.item,
+      zone: questDef.zone,
+      required: questDef.required,
+      progress: 0,
+      rewardText: questDef.rewardText,
+      reward: questDef.reward,
+    };
+    
+    player.activeQuests.push(activeQuest);
+    socket.emit('questAcceptedNpc', { quest: activeQuest });
+    console.log(`📜 ${player.name} accepted quest: ${questDef.name}`);
+  });
+
+  // Abandon a quest
+  socket.on('abandonQuest', (data) => {
+    const { questId } = data || {};
+    if (!questId) return;
+    const player = getPlayerBySocket(socket.id);
+    if (!player) return;
+    
+    player.activeQuests = player.activeQuests.filter(q => q.id !== questId);
+    socket.emit('questAbandoned', { questId });
+    console.log(`❌ ${player.name} abandoned quest: ${questId}`);
+  });
+
+  // Turn in a completed quest
+  socket.on('turnInQuest', (data) => {
+    const { questId } = data || {};
+    if (!questId) return;
+    const player = getPlayerBySocket(socket.id);
+    if (!player) return;
+    
+    const questIdx = player.activeQuests.findIndex(q => q.id === questId && q.progress >= q.required);
+    if (questIdx === -1) return;
+    
+    const quest = player.activeQuests[questIdx];
+    const questDef = HUNT_QUESTS.find(q => q.id === questId) || COLLECT_QUESTS.find(q => q.id === questId);
+    if (!questDef) return;
+    
+    // Apply rewards
+    const reward = questDef.reward;
+    if (!player.questBonuses) player.questBonuses = { maxHealth: 0, speed: 0, damagePercent: 0, healBonus: 0, cooldownReduction: 0 };
+    
+    if (reward.maxHealth) {
+      player.questBonuses.maxHealth += reward.maxHealth;
+      player.maxHealth += reward.maxHealth;
+      player.health = Math.min(player.health + reward.maxHealth, player.maxHealth);
+    }
+    if (reward.speed) {
+      player.questBonuses.speed += reward.speed;
+      player.baseSpeed += reward.speed;
+    }
+    if (reward.damagePercent) {
+      player.questBonuses.damagePercent += reward.damagePercent;
+      player.damageMultiplier *= (1 + reward.damagePercent / 100);
+    }
+    if (reward.healBonus) {
+      player.questBonuses.healBonus += reward.healBonus;
+    }
+    if (reward.cooldownReduction) {
+      player.questBonuses.cooldownReduction += reward.cooldownReduction;
+      player.cooldownMultiplier *= (1 - reward.cooldownReduction / 100);
+    }
+    
+    // Remove from active, add to completed
+    player.activeQuests.splice(questIdx, 1);
+    player.completedQuests.push(questId);
+    
+    // Bonus XP
+    const bonusXp = (questDef.tier || 1) * 500;
+    player.xp += bonusXp;
+    player.totalXp += bonusXp;
+    
+    socket.emit('questCompleteNpc', { 
+      questId, 
+      name: quest.name,
+      rewardText: questDef.rewardText,
+      xp: bonusXp,
+      questBonuses: { ...player.questBonuses },
+    });
+    
+    savePlayerToDb(player);
+    console.log(`🏆 ${player.name} completed quest: ${quest.name} → ${questDef.rewardText}`);
+  });
+
   socket.on('interactNpc', (data) => {
     const { npcId } = data || {};
     for (const player of gameState.players.values()) {
@@ -1974,6 +2098,44 @@ io.on('connection', (socket) => {
             prompt: 'What would you like to do?',
             hasChoice: true,
             openDungeonBrowser: true,
+          });
+        } else if (npc.type === 'hunt_master') {
+          // Hunt Master - kill quests
+          const greeting = npc.greetings[Math.floor(Math.random() * npc.greetings.length)];
+          const available = HUNT_QUESTS.filter(q => 
+            !player.completedQuests.includes(q.id) && 
+            !player.activeQuests.some(aq => aq.id === q.id)
+          );
+          const active = player.activeQuests.filter(q => q.type === 'kill');
+          socket.emit('npcDialogue', {
+            npcId: npc.id,
+            npcName: npc.name,
+            npcType: 'hunt_master',
+            dialogue: [greeting],
+            hasChoice: true,
+            questMenu: true,
+            availableQuests: available.map(q => ({ id: q.id, name: q.name, description: q.description, rewardText: q.rewardText, tier: q.tier })),
+            activeQuests: active.map(q => ({ id: q.id, name: q.name, progress: q.progress, required: q.required })),
+            completedCount: player.completedQuests.filter(qid => HUNT_QUESTS.some(hq => hq.id === qid)).length,
+          });
+        } else if (npc.type === 'herbalist') {
+          // Herbalist - collection quests
+          const greeting = npc.greetings[Math.floor(Math.random() * npc.greetings.length)];
+          const available = COLLECT_QUESTS.filter(q => 
+            !player.completedQuests.includes(q.id) && 
+            !player.activeQuests.some(aq => aq.id === q.id)
+          );
+          const active = player.activeQuests.filter(q => q.type === 'collect');
+          socket.emit('npcDialogue', {
+            npcId: npc.id,
+            npcName: npc.name,
+            npcType: 'herbalist',
+            dialogue: [greeting],
+            hasChoice: true,
+            questMenu: true,
+            availableQuests: available.map(q => ({ id: q.id, name: q.name, description: q.description, rewardText: q.rewardText, tier: q.tier, itemEmoji: q.itemEmoji })),
+            activeQuests: active.map(q => ({ id: q.id, name: q.name, progress: q.progress, required: q.required })),
+            completedCount: player.completedQuests.filter(qid => COLLECT_QUESTS.some(cq => cq.id === qid)).length,
           });
         }
         break;

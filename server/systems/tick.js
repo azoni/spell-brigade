@@ -8,6 +8,8 @@ import { ENEMY_TYPES, ZONE_BOSS_TYPES } from '../config/enemies.js';
 import { CLASSES } from '../config/classes.js';
 import { SPELLS } from '../config/spells.js';
 import { MAX_ENEMIES, TICK_RATE, VIEW_DISTANCE, XP_ORB } from '../config/constants.js';
+import { COLLECT_QUESTS } from '../config/npcs.js';
+import { respawnCollectible } from '../state.js';
 import { getDungeonRoom, getDungeonBounds, getRoomEnemies, getRoomCenterY } from '../dungeon-generator.js';
 import {
   distance, normalize, clamp, xpForLevel, lerp,
@@ -1483,6 +1485,55 @@ export function gameTick() {
   }
 
   // --- UPDATE PARTICLES ---
+
+  // --- COLLECTIBLE PICKUP ---
+  if (gameState.collectibles.size > 0) {
+    for (const [cId, collectible] of gameState.collectibles) {
+      for (const player of gameState.players.values()) {
+        if (player.health <= 0) continue;
+        const dx = player.x - collectible.x;
+        const dy = player.y - collectible.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < (collectible.pickupRadius || 40)) {
+          // Check if player has an active collect quest for this item
+          const quest = player.activeQuests?.find(q => q.type === 'collect' && q.target === collectible.item && q.progress < q.required);
+          if (quest) {
+            quest.progress += 1;
+            gameState.collectibles.delete(cId);
+            
+            const playerSocket = io.sockets.sockets.get(player.socketId);
+            if (playerSocket) {
+              playerSocket.emit('collectiblePickup', {
+                item: collectible.item,
+                emoji: collectible.emoji,
+                color: collectible.color,
+                x: collectible.x,
+                y: collectible.y,
+              });
+              playerSocket.emit('questProgressUpdate', {
+                questId: quest.id,
+                progress: quest.progress,
+                required: quest.required,
+                name: quest.name,
+                complete: quest.progress >= quest.required,
+              });
+            }
+            
+            // Respawn after 60 seconds
+            const questDef = COLLECT_QUESTS.find(q => q.item === collectible.item);
+            if (questDef) {
+              setTimeout(() => {
+                respawnCollectible(collectible.zone, collectible.item, questDef);
+              }, 60000);
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // --- UPDATE PARTICLES ---
   gameState.particles = gameState.particles.filter(p => {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
@@ -1631,6 +1682,12 @@ export function gameTick() {
       .filter(o => Math.abs(o.x - px) < VIEW_DISTANCE && Math.abs(o.y - py) < VIEW_DISTANCE)
       .map(o => ({ id: o.id, x: Math.round(o.x), y: Math.round(o.y), amount: o.amount }));
     
+    // Only send collectibles for items the player has active quests for
+    const playerQuestItems = new Set((player.activeQuests || []).filter(q => q.type === 'collect' && q.progress < q.required).map(q => q.target));
+    const nearbyCollectibles = playerQuestItems.size > 0 ? [...gameState.collectibles.values()]
+      .filter(c => playerQuestItems.has(c.item) && Math.abs(c.x - px) < VIEW_DISTANCE && Math.abs(c.y - py) < VIEW_DISTANCE)
+      .map(c => ({ id: c.id, x: Math.round(c.x), y: Math.round(c.y), color: c.color, emoji: c.emoji })) : [];
+    
     const nearbyParticles = gameState.particles
       .filter(p => Math.abs(p.x - px) < VIEW_DISTANCE && Math.abs(p.y - py) < VIEW_DISTANCE)
       .slice(0, 80)
@@ -1739,6 +1796,7 @@ export function gameTick() {
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,
       xpOrbs: nearbyOrbs,
+      collectibles: nearbyCollectibles,
       particles: nearbyParticles,
       damageNumbers: nearbyDmgNums,
       npcs: nearbyNpcs,
@@ -1791,6 +1849,25 @@ export function checkEnemyDeath(enemy, killerId) {
     // Track kill
     if (killer && killer.health > 0) {
       killer.kills = (killer.kills || 0) + 1;
+      
+      // Update kill quest progress
+      if (killer.activeQuests && killer.activeQuests.length > 0) {
+        for (const quest of killer.activeQuests) {
+          if (quest.type === 'kill' && quest.target === enemy.type && quest.progress < quest.required) {
+            quest.progress += 1;
+            const killerSocket = io.sockets.sockets.get(killer.socketId);
+            if (killerSocket) {
+              killerSocket.emit('questProgressUpdate', { 
+                questId: quest.id, 
+                progress: quest.progress, 
+                required: quest.required,
+                name: quest.name,
+                complete: quest.progress >= quest.required,
+              });
+            }
+          }
+        }
+      }
     }
     
     // Death particles

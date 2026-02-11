@@ -9,7 +9,7 @@ import { WORLD } from './config/world.js';
 import { CLASSES } from './config/classes.js';
 
 // State
-import gameState, { initNpcs } from './state.js';
+import gameState, { initNpcs, spawnCollectibles } from './state.js';
 
 // Database
 import { playersDb, savePlayerToDb } from './db/index.js';
@@ -91,7 +91,8 @@ populateWorld();
 
 // Initialize NPCs
 initNpcs();
-console.log('🧙 NPCs initialized');
+spawnCollectibles();
+console.log('🧙 NPCs and collectibles initialized');
 
 // Register socket events
 registerSocketEvents(io);
