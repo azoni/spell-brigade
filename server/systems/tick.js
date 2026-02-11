@@ -1645,37 +1645,38 @@ export function gameTick() {
         }
         return true;
       })
-      .map(e => ({
-        id: e.id,
-        type: e.behavior === 'ambush' && !e.revealed ? 'xpOrb' : e.type,
-        name: e.name,
-        x: Math.round(e.x),
-        y: Math.round(e.y),
-        health: Math.round(e.health),
-        maxHealth: e.maxHealth,
-        radius: e.radius || 14,
-        facing: e.facing || 'down',
-        animFrame: e.animFrame || 0,
-        isSlowed: e.slowedUntil > now,
-        isFrozen: e.frozenUntil > now,
-        isBoss: e.isBoss || false,
-        isMiniBoss: e.isMiniBoss || false,
-        isCustomBoss: e.isCustomBoss || false,
-        behavior: e.behavior,
-        isCharging: e.isCharging || false,
-        color: e.color || undefined,
-        phase: e.phase || undefined,
-      }));
+      .map(e => {
+        // Minimal data for regular enemies, extra for bosses
+        const base = {
+          id: e.id,
+          type: e.behavior === 'ambush' && !e.revealed ? 'xpOrb' : e.type,
+          x: Math.round(e.x),
+          y: Math.round(e.y),
+          health: Math.round(e.health),
+          maxHealth: e.maxHealth,
+        };
+        if (e.isBoss || e.isMiniBoss || e.isCustomBoss) {
+          base.name = e.name;
+          base.isBoss = true;
+          if (e.isMiniBoss) base.isMiniBoss = true;
+          if (e.isCustomBoss) base.isCustomBoss = true;
+          base.radius = e.radius || 14;
+          base.phase = e.phase;
+          base.color = e.color;
+        }
+        if (e.isCharging) base.isCharging = true;
+        if (e.slowedUntil > now) base.isSlowed = true;
+        if (e.frozenUntil > now) base.isFrozen = true;
+        return base;
+      });
     
     const nearbyProjectiles = [...gameState.projectiles.values()]
       .filter(p => Math.abs(p.x - px) < VIEW_DISTANCE && Math.abs(p.y - py) < VIEW_DISTANCE)
       .map(p => ({
         id: p.id, x: Math.round(p.x), y: Math.round(p.y),
-        radius: p.radius, color: p.color, trailColor: p.trailColor,
-        spellId: p.spellId, ownerClass: p.ownerClass, level: p.ownerLevel || 1,
-        projectileShape: p.projectileShape || null,
-        vx: p.vx ? Math.round(p.vx) : undefined,
-        vy: p.vy ? Math.round(p.vy) : undefined,
+        radius: p.radius, color: p.color,
+        spellId: p.spellId, ownerClass: p.ownerClass,
+        projectileShape: p.projectileShape || undefined,
       }));
     
     const nearbyOrbs = [...gameState.xpOrbs.values()]
@@ -1733,74 +1734,96 @@ export function gameTick() {
     }
     
     // Get nearby NPCs
-    const nearbyNpcs = [...gameState.npcs.values()]
-      .filter(npc => Math.abs(npc.currentX - px) < VIEW_DISTANCE && Math.abs(npc.currentY - py) < VIEW_DISTANCE)
-      .map(npc => ({
-        id: npc.id,
-        name: npc.name,
-        type: npc.type,
-        x: Math.round(npc.currentX),
-        y: Math.round(npc.currentY),
-        color: npc.color,
-        emoji: npc.emoji,
-        facing: npc.facing || 'down',
-        interactRange: npc.interactRange,
-        stationary: npc.stationary,
-      }));
-    
-    socket.emit('gameState', {
+    // Only send NPCs every 60 ticks (~3s) since they barely move
+    const sendNpcs = (gameState.tickCount % 60 === 0) || !player._npcsSent;
+    let nearbyNpcs = [];
+    if (sendNpcs) {
+      player._npcsSent = true;
+      nearbyNpcs = [...gameState.npcs.values()]
+        .filter(npc => Math.abs(npc.currentX - px) < VIEW_DISTANCE && Math.abs(npc.currentY - py) < VIEW_DISTANCE)
+        .map(npc => ({
+          id: npc.id, name: npc.name, type: npc.type,
+          x: Math.round(npc.currentX), y: Math.round(npc.currentY),
+          color: npc.color, emoji: npc.emoji, interactRange: npc.interactRange,
+        }));
+    }
+
+    // Self: full data
+    const selfData = {
+      id: player.id, name: player.name, class: player.class,
+      x: Math.round(player.x), y: Math.round(player.y),
+      health: Math.round(player.health), maxHealth: player.maxHealth,
+      level: player.level, xp: player.xp, totalXp: player.totalXp || 0, xpToLevel: xpForLevel(player.level),
+      kills: player.kills || 0, deaths: player.deaths || 0,
+      state: player.state || 'idle', facing: player.facing || 'down', animFrame: player.animFrame || 0,
+      selectedSkin: player.selectedSkin || `${player.class}_default`,
+      cooldowns,
+      isHealing: player.isHealing || false,
+      inFountain: player.inFountain || false,
+      fountainBoostRemaining: (player.fountainSpeedBoostUntil && player.fountainSpeedBoostUntil > now && !player.inFountain)
+        ? Math.ceil((player.fountainSpeedBoostUntil - now) / 1000) : 0,
+      bossKills: player.bossKills || {},
+      upgrades: player.upgrades || {},
+      damageMultiplier: player.damageMultiplier || 1,
+      speedMultiplier: player.speedMultiplier || 1,
+      cooldownMultiplier: player.cooldownMultiplier || 1,
+      attackSpeedMultiplier: player.attackSpeedMultiplier || 1,
+      baseSpeed: player.baseSpeed || 150,
+      isAdmin: player.isAdmin || false,
+    };
+    if (player.emote) { selfData.emote = player.emote; selfData.emoteStart = player.emoteStart; }
+    if (player.isCustomWizard) {
+      selfData.isCustomWizard = true;
+      selfData.customColor = player.color;
+      selfData.customSecondaryColor = player.secondaryColor;
+      selfData.customClassName = player.className;
+      selfData.customIconStyle = player.iconStyle || 'star';
+      selfData.customBodyStyle = player.bodyStyle || 'wizard';
+      selfData.customProjectileShape = player.projectileShape || 'orb';
+      selfData.customHeadgear = player.headgear || 'pointyHat';
+    }
+
+    // Others: minimal visual data
+    const otherPlayers = [...gameState.players.values()]
+      .filter(p => {
+        if (p.id === player.id) return false;
+        const pInDungeon = p.inDungeon || false;
+        if (pInDungeon !== playerInDungeon) return false;
+        if (playerInDungeon && pInDungeon && (p.customDungeonId || 'default') !== (player.customDungeonId || 'default')) return false;
+        return Math.abs(p.x - px) < VIEW_DISTANCE && Math.abs(p.y - py) < VIEW_DISTANCE;
+      })
+      .map(p => {
+        const o = {
+          id: p.id, name: p.name, class: p.class,
+          x: Math.round(p.x), y: Math.round(p.y),
+          health: Math.round(p.health), maxHealth: p.maxHealth,
+          level: p.level,
+          state: p.state || 'idle', facing: p.facing || 'down', animFrame: p.animFrame || 0,
+          selectedSkin: p.selectedSkin || `${p.class}_default`,
+        };
+        if (p.emote) { o.emote = p.emote; o.emoteStart = p.emoteStart; }
+        if (p.isHealing) o.isHealing = true;
+        if (p.isCustomWizard) {
+          o.isCustomWizard = true; o.customColor = p.color; o.customSecondaryColor = p.secondaryColor;
+          o.customBodyStyle = p.bodyStyle || 'wizard'; o.customProjectileShape = p.projectileShape || 'orb';
+          o.customHeadgear = p.headgear || 'pointyHat';
+        }
+        return o;
+      });
+
+    const payload = {
       tick: gameState.tickCount,
-      timestamp: now,
-      players: [...gameState.players.values()]
-        .filter(p => {
-          // Only show players in same realm (dungeon vs world)
-          const pInDungeon = p.inDungeon || false;
-          if (pInDungeon !== playerInDungeon) return false;
-          // Within dungeons, only show players in the same dungeon instance
-          if (playerInDungeon && pInDungeon) {
-            if ((p.customDungeonId || 'default') !== (player.customDungeonId || 'default')) return false;
-          }
-          return true;
-        })
-        .map(p => ({
-        id: p.id, name: p.name, class: p.class,
-        x: Math.round(p.x), y: Math.round(p.y),
-        health: Math.round(p.health), maxHealth: p.maxHealth,
-        level: p.level, xp: p.xp, totalXp: p.totalXp || 0, xpToLevel: xpForLevel(p.level),
-        kills: p.kills || 0, deaths: p.deaths || 0,
-        state: p.state || 'idle', facing: p.facing || 'down', animFrame: p.animFrame || 0,
-        selectedSkin: p.selectedSkin || `${p.class}_default`,
-        cooldowns: p.id === player.id ? cooldowns : {},
-        emote: p.emote || null, emoteStart: p.emoteStart || null,
-        isHealing: p.isHealing || false,
-        inFountain: p.inFountain || false,
-        fountainBoostRemaining: (p.id === player.id && p.fountainSpeedBoostUntil && p.fountainSpeedBoostUntil > now && !p.inFountain) 
-          ? Math.ceil((p.fountainSpeedBoostUntil - now) / 1000) : 0,
-        bossKills: p.bossKills || {},
-        upgrades: p.upgrades || { health: 0, damage: 0, speed: 0, cooldown: 0, attackSpeed: 0 },
-        inDungeon: p.inDungeon || false,
-        damageMultiplier: p.damageMultiplier || 1,
-        speedMultiplier: p.speedMultiplier || 1,
-        cooldownMultiplier: p.cooldownMultiplier || 1,
-        attackSpeedMultiplier: p.attackSpeedMultiplier || 1,
-        isAdmin: p.isAdmin || false,
-        isCustomWizard: p.isCustomWizard || false,
-        customColor: p.isCustomWizard ? p.color : undefined,
-        customSecondaryColor: p.isCustomWizard ? p.secondaryColor : undefined,
-        customClassName: p.isCustomWizard ? p.className : undefined,
-        customIconStyle: p.isCustomWizard ? (p.iconStyle || 'star') : undefined,
-        customBodyStyle: p.isCustomWizard ? (p.bodyStyle || 'wizard') : undefined,
-        customProjectileShape: p.isCustomWizard ? (p.projectileShape || 'orb') : undefined,
-        customHeadgear: p.isCustomWizard ? (p.headgear || 'pointyHat') : undefined,
-      })),
+      self: selfData,
+      players: otherPlayers,
       enemies: nearbyEnemies,
       projectiles: nearbyProjectiles,
       xpOrbs: nearbyOrbs,
       collectibles: nearbyCollectibles,
       particles: nearbyParticles,
       damageNumbers: nearbyDmgNums,
-      npcs: nearbyNpcs,
-    });
+    };
+    if (nearbyNpcs.length > 0) payload.npcs = nearbyNpcs;
+    socket.emit('gameState', payload);
   }
 }
 

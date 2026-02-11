@@ -21,7 +21,7 @@ export function pointInPolygon(x, y, polygon) {
 
 export const SANCTUARY_CENTER = { x: 10500, y: 9000 };
 export const SANCTUARY_RADIUS = 1500;
-export const SANCTUARY_BUFFER = 500;
+export const SANCTUARY_BUFFER = 100; // Enemies can chase right up to sanctuary edge
 
 export const ZONES = {
   sanctuary: {
