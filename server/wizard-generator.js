@@ -381,20 +381,29 @@ function clampWizardOutput(data) {
 export async function generateWizard(prompt, quality = 'premium') {
   if (isLLMEnabled()) {
     console.log(`🧙 Generating wizard via LLM (${quality}): "${prompt}"`);
-    const llmData = await llmGenerate(
-      WIZARD_SYSTEM_PROMPT,
-      `Create a wizard class based on this player concept:\n\n"${prompt}"\n\nRespond with ONLY the JSON. No markdown fences, no explanation.`,
-      1500,
-      quality
-    );
-    if (llmData) {
-      console.log(`🧙 LLM returned: "${llmData.name}"`);
-      const result = clampWizardOutput(llmData);
-      result.generatedBy = 'ai';
-      result.modelUsed = quality;
-      return result;
+    try {
+      const llmData = await llmGenerate(
+        WIZARD_SYSTEM_PROMPT,
+        `Create a wizard class based on this player concept:\n\n"${prompt}"\n\nRespond with ONLY the JSON. No markdown fences, no explanation.`,
+        1500,
+        quality
+      );
+      // Validate LLM response has the minimum required structure
+      if (llmData && typeof llmData === 'object' 
+          && typeof llmData.name === 'string' 
+          && typeof llmData.spell1 === 'object' && llmData.spell1 !== null
+          && typeof llmData.spell1.name === 'string') {
+        console.log(`🧙 LLM returned valid wizard: "${llmData.name}"`);
+        const result = clampWizardOutput(llmData);
+        result.generatedBy = 'ai';
+        result.modelUsed = quality;
+        return result;
+      }
+      console.warn('🧙 LLM returned malformed data, falling back to templates. Got:', 
+        llmData ? `name=${typeof llmData.name}, spell1=${typeof llmData.spell1}` : 'null');
+    } catch (err) {
+      console.warn('🧙 LLM generation threw error:', err.message);
     }
-    console.warn('LLM generation failed, falling back to templates');
   } else {
     console.log('🧙 No API key configured — using template fallback');
   }
@@ -579,9 +588,10 @@ function generateFromTemplate(prompt) {
   const v = () => 0.96 + Math.random() * 0.1;
   
   // Try to extract custom name from prompt
-  const words = prompt.trim().split(/\s+/).filter(w => w.length >= 3 && !['the','and','who','with','that','from'].includes(w.toLowerCase()));
+  const words = prompt.trim().split(/\s+/).filter(w => w.length >= 2 && !['the','and','who','with','that','from','for','its','has','are','was','can','his','her','but','not','you','all','this','they','one','our','out'].includes(w.toLowerCase()));
   let customName = bestTemplate.name;
-  if (words.length >= 2) {
+  if (words.length >= 1) {
+    // Always use prompt words for the name — never show template defaults
     customName = words.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').slice(0, 25);
   }
   
