@@ -1218,6 +1218,64 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Right-click: fire secondary spell (spell2) at cursor
+  socket.on('manualAttack2', (data) => {
+    const { targetX, targetY } = data || {};
+    if (typeof targetX !== 'number' || typeof targetY !== 'number') return;
+    for (const player of gameState.players.values()) {
+      if (player.socketId === socket.id) {
+        if (player.health <= 0) break;
+        
+        const classData = CLASSES[player.class];
+        const playerSpells = player.spells || (classData ? classData.spells : []);
+        if (!playerSpells || playerSpells.length < 2) break;
+        
+        const now = Date.now();
+        const spellId = playerSpells[1]; // Second spell
+        const spell = SPELLS[spellId];
+        if (!spell) break;
+        
+        const lastCast = player.lastCast?.[spellId] || 0;
+        const effectiveCooldown = spell.cooldown * (player.cooldownMultiplier || 1) * (player.attackSpeedMultiplier || 1);
+        if (now - lastCast >= effectiveCooldown) {
+          if (spell.type === 'aoe' || (spell.speed === 0 && spell.radius > 40)) {
+            // AOE spell: deal damage at target area
+            const aoeX = targetX;
+            const aoeY = targetY;
+            const dmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+            const playerInDungeon = player.inDungeon || false;
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              if (playerInDungeon !== (enemy.isDungeon || false)) continue;
+              if (playerInDungeon && (enemy.isDungeon || false)) {
+                if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
+              }
+              if (distance(enemy, { x: aoeX, y: aoeY }) < spell.radius) {
+                enemy.health -= dmg;
+                spawnDamageNumber(enemy.x, enemy.y - 10, dmg);
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+            io.emit('customAbilityEffect', {
+              playerId: player.id, style: 'burst',
+              x: aoeX, y: aoeY, radius: spell.radius,
+              color: spell.color || '#a78bfa', name: spell.name, duration: 800,
+            });
+            spawnParticles(aoeX, aoeY, spell.color || '#a78bfa', 10);
+          } else {
+            // Projectile spell: fire full damage at cursor
+            createProjectile(player, spell, targetX, targetY);
+          }
+          player.lastCast = player.lastCast || {};
+          player.lastCast[spellId] = now;
+          player.state = 'attack';
+          io.emit('sound', { type: 'spell', spellId, x: player.x, y: player.y });
+        }
+        break;
+      }
+    }
+  });
+
   // Toggle PvP (Voidlord only)
   socket.on('togglePvP', () => {
     for (const player of gameState.players.values()) {
@@ -1823,35 +1881,112 @@ io.on('connection', (socket) => {
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
 
       } else if (spell.type === 'classAbility') {
-        // Generic custom wizard ability - AOE damage burst
-        const abilityDmg = spell.damage * (player.damageMultiplier || 1);
+        // Custom wizard abilities - different execution per style
+        const abilityDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
         const abilityRadius = spell.radius || 150;
+        const abilityColor = spell.color || player.color || '#a78bfa';
+        const abilityStyle = spell.style || 'burst';
         
-        // Deal damage to nearby enemies
-        for (const enemy of gameState.enemies.values()) {
-          if (enemy.health <= 0) continue;
-          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
-          if (distance(enemy, player) < abilityRadius) {
-            enemy.health -= abilityDmg;
-            if (enemy.health <= 0) {
+        if (abilityStyle === 'targeted') {
+          // SLOT 2: Targeted delayed AOE at cursor position (like meteor strike)
+          const strikeX = tx ?? player.x;
+          const strikeY = ty ?? player.y;
+          const delay = 800; // Warning time before impact
+          
+          // Send warning circle
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'targeted_warning',
+            x: strikeX, y: strikeY, radius: abilityRadius,
+            color: abilityColor, name: spell.name, duration: delay,
+          });
+          
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: abilityColor });
+          
+          // Delayed impact
+          setTimeout(() => {
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+              if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
+                if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
+              }
+              const d = Math.sqrt((enemy.x - strikeX) ** 2 + (enemy.y - strikeY) ** 2);
+              if (d < abilityRadius) {
+                // More damage at center, less at edge
+                const falloff = 1 - (d / abilityRadius) * 0.4;
+                const dmg = Math.floor(abilityDmg * falloff);
+                enemy.health -= dmg;
+                spawnDamageNumber(enemy.x, enemy.y - 10, dmg);
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+            io.emit('customAbilityEffect', {
+              playerId: player.id, style: 'targeted_impact',
+              x: strikeX, y: strikeY, radius: abilityRadius,
+              color: abilityColor, name: spell.name, duration: 1500,
+            });
+            spawnParticles(strikeX, strikeY, abilityColor, 20);
+          }, delay);
+          
+        } else if (abilityStyle === 'sustained') {
+          // SLOT 3: Massive sustained pulsing AOE - damage over duration
+          const pulseCount = Math.floor((spell.duration || 4000) / 500);
+          const dmgPerPulse = Math.floor(abilityDmg / Math.max(pulseCount, 1));
+          
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'sustained',
+            x: player.x, y: player.y, radius: abilityRadius,
+            color: abilityColor, name: spell.name, duration: spell.duration || 4000,
+          });
+          
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: abilityColor });
+          
+          let pulsesDone = 0;
+          const pulseInterval = setInterval(() => {
+            if (pulsesDone >= pulseCount || player.health <= 0) {
+              clearInterval(pulseInterval);
+              return;
+            }
+            pulsesDone++;
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0) continue;
+              if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+              if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
+                if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
+              }
+              if (distance(enemy, player) < abilityRadius) {
+                enemy.health -= dmgPerPulse;
+                spawnDamageNumber(enemy.x, enemy.y - 10, dmgPerPulse);
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+            spawnParticles(player.x, player.y, abilityColor, 8);
+          }, 500);
+          
+        } else {
+          // SLOT 1: Instant burst around player (default)
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
+              if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
+            }
+            if (distance(enemy, player) < abilityRadius) {
+              enemy.health -= abilityDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 10, abilityDmg);
               checkEnemyDeath(enemy, player.id);
             }
           }
+          
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'burst',
+            x: player.x, y: player.y, radius: abilityRadius,
+            color: abilityColor, name: spell.name, duration: spell.duration || 2000,
+          });
+          
+          spawnParticles(player.x, player.y, abilityColor, 15);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: abilityColor });
         }
-        
-        // Broadcast visual effect to all players
-        io.emit('customAbilityEffect', {
-          playerId: player.id,
-          x: player.x,
-          y: player.y,
-          radius: abilityRadius,
-          color: spell.color || player.color || '#a78bfa',
-          name: spell.name,
-          duration: spell.duration || 3000,
-        });
-        
-        spawnParticles(player.x, player.y, spell.color || '#a78bfa', 15);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       }
       
       break;

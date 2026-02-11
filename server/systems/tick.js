@@ -990,8 +990,13 @@ export function gameTick() {
     }
     // ========== END BOSS ATTACKS ==========
 
+    // Calculate chase range - extended when already aggro'd
+    const baseAggro = enemy.aggroRange || 400;
+    const chaseRange = enemy._chasing ? baseAggro * 2 : baseAggro;
+
     // Wander if no player nearby (keeps enemies moving within zone)
-    if (!nearestPlayer || nearestDist > 400) {
+    if (!nearestPlayer || nearestDist > chaseRange) {
+      enemy._chasing = false; // Lost target, reset aggro
       // Random wander
       if (!enemy.wanderAngle || Math.random() < 0.02) {
         enemy.wanderAngle = Math.random() * Math.PI * 2;
@@ -1036,60 +1041,45 @@ export function gameTick() {
       }
     }
     
-    if (nearestPlayer && nearestDist <= (enemy.aggroRange || 400)) {
-      // Check if we would enter sanctuary buffer - don't chase into safe zone
-      const playerTooClose = isTooCloseToSanctuary(nearestPlayer.x, nearestPlayer.y);
+    if (nearestPlayer && nearestDist <= chaseRange) {
+      enemy._chasing = true; // Track aggro state for extended chase
+      // Enemies WILL chase players into sanctuary - no safe sniping
+      const dir = normalize({ 
+        x: nearestPlayer.x - enemy.x, 
+        y: nearestPlayer.y - enemy.y 
+      });
       
-      if (!playerTooClose) {
-        const dir = normalize({ 
-          x: nearestPlayer.x - enemy.x, 
-          y: nearestPlayer.y - enemy.y 
-        });
-        
-        // Calculate new position
-        let newX = enemy.x + dir.x * currentSpeed * dt;
-        let newY = enemy.y + dir.y * currentSpeed * dt;
-        
-        // Dungeon enemies use different bounds (not world zone polygons)
-        if (enemyInDungeon) {
-          // Dungeon bounds: x: 0-1800, y: 0-6500 (dragon lair area)
-          newX = Math.max(50, Math.min(1750, newX));
-          newY = Math.max(50, Math.min(6450, newY));
-        } else {
-          // ALL world enemies must stay in their zone (polygon check)
-          if (enemyZone?.polygon) {
-            if (!pointInPolygon(newX, newY, enemyZone.polygon)) {
-              // Stay at current position if would leave zone
-              newX = enemy.x;
-              newY = enemy.y;
-            }
-          }
-          
-          // Also prevent entering sanctuary buffer
-          if (isTooCloseToSanctuary(newX, newY)) {
-            newX = enemy.x;
-            newY = enemy.y;
-          }
-        }
-        
-        enemy.x = newX;
-        enemy.y = newY;
-        
-        // Update facing
-        if (Math.abs(dir.x) > Math.abs(dir.y)) {
-          enemy.facing = dir.x > 0 ? 'right' : 'left';
-        } else {
-          enemy.facing = dir.y > 0 ? 'down' : 'up';
-        }
+      // Calculate new position
+      let newX = enemy.x + dir.x * currentSpeed * dt;
+      let newY = enemy.y + dir.y * currentSpeed * dt;
+      
+      // Dungeon enemies use different bounds (not world zone polygons)
+      if (enemyInDungeon) {
+        // Dungeon bounds: x: 0-1800, y: 0-6500 (dragon lair area)
+        newX = Math.max(50, Math.min(1750, newX));
+        newY = Math.max(50, Math.min(6450, newY));
+      } else {
+        // World enemies can leave their zone polygon when chasing a player
+        // but not go out of world bounds
+        newX = clamp(newX, 50, WORLD.width - 50);
+        newY = clamp(newY, 50, WORLD.height - 50);
+      }
+      
+      enemy.x = newX;
+      enemy.y = newY;
+      
+      // Update facing
+      if (Math.abs(dir.x) > Math.abs(dir.y)) {
+        enemy.facing = dir.x > 0 ? 'right' : 'left';
+      } else {
+        enemy.facing = dir.y > 0 ? 'down' : 'up';
       }
 
-      // Attack player on collision (only if in same zone and not in sanctuary)
+      // Attack player on collision
       // Dungeon enemies skip world zone checks - they use dungeonId isolation instead
-      const attackTargetZone = enemyInDungeon ? null : getZoneAtPosition(nearestPlayer.x, nearestPlayer.y);
-      const targetInSanctuary = attackTargetZone?.id === 'sanctuary';
       const canAttack = enemyInDungeon
         ? true  // Dungeon enemies can always attack (targeting already filtered by dungeonId)
-        : (!targetInSanctuary && (!enemyZone || !attackTargetZone || attackTargetZone.id === enemyZone.id));
+        : true; // World enemies can attack anywhere they can reach (including sanctuary if aggro'd)
       
       const collisionDist = enemy.radius + 16; // player radius
       if (canAttack && nearestDist < collisionDist && now - enemy.lastAttack > 500) {

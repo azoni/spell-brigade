@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
 import { llmGenerate, isLLMEnabled } from './openrouter.js';
-import { logActivity } from './activity-logger.js';
 
 // ===========================================
 // AI WIZARD GENERATOR - Claude-powered class creation
@@ -73,6 +72,7 @@ Shadow Archer (fragile sniper): HP 75, Speed 200
 10. Names should be evocative AND thematic — "Folding Chair Fling" not "Chair Attack", "Pepperoni Bolt" not "Food Projectile"
 11. Lore should be 1-2 sentences explaining the class's backstory in a fun way
 12. The description should be a catchy one-liner that sells the class fantasy
+13. IMPORTANT: Every ability description MUST specifically say what happens visually and mechanically — "Summons a ring of fire that burns enemies in a wide area" not just "Deals AOE fire damage". Players READ these in their skill bar, so make them vivid and match the theme exactly.
 
 ## OUTPUT — RESPOND WITH ONLY THIS JSON, NO MARKDOWN, NO EXPLANATION:
 {
@@ -284,12 +284,14 @@ function clampSpell(spellData, index, classColor) {
 function clampAbility(abilityData, slot, classId, color) {
   const C = CLAMP.ability[slot];
   const fallbackNames = { 1: 'Power Strike', 2: 'Energy Burst', 3: 'Cataclysm' };
+  // Each slot gets a distinct execution style
+  const styles = { 1: 'burst', 2: 'targeted', 3: 'sustained' };
   
   if (!abilityData || typeof abilityData !== 'object') {
     return {
       id: `custom_ability${slot}_${classId}`, name: fallbackNames[slot],
       damage: C.damage[0], cooldown: C.cooldown[0], radius: C.radius[0], duration: C.duration[0],
-      color, isAoe: true, type: 'classAbility',
+      color, isAoe: true, type: 'classAbility', style: styles[slot],
     };
   }
 
@@ -301,7 +303,7 @@ function clampAbility(abilityData, slot, classId, color) {
     radius: clamp(abilityData.radius, C.radius[0], C.radius[1]),
     duration: clamp(abilityData.duration, C.duration[0], C.duration[1]),
     color: isValidHex(abilityData.color) ? abilityData.color : color,
-    isAoe: true, type: 'classAbility',
+    isAoe: true, type: 'classAbility', style: styles[slot],
     description: (typeof abilityData.description === 'string' ? abilityData.description : '').slice(0, 100),
   };
 }
@@ -379,7 +381,7 @@ function clampWizardOutput(data) {
 export async function generateWizard(prompt, quality = 'premium') {
   if (isLLMEnabled()) {
     console.log(`🧙 Generating wizard via LLM (${quality}): "${prompt}"`);
-    const { result: llmData, usage } = await llmGenerate(
+    const llmData = await llmGenerate(
       WIZARD_SYSTEM_PROMPT,
       `Create a wizard class based on this player concept:\n\n"${prompt}"\n\nRespond with ONLY the JSON. No markdown fences, no explanation.`,
       1500,
@@ -390,18 +392,6 @@ export async function generateWizard(prompt, quality = 'premium') {
       const result = clampWizardOutput(llmData);
       result.generatedBy = 'ai';
       result.modelUsed = quality;
-
-      // Log to portfolio activity feed
-      logActivity({
-        type: 'wizard_created',
-        title: `AI Wizard: ${result.classDef.name}`,
-        description: result.classDef.description || `Custom wizard from "${prompt}"`,
-        model: usage?.model || 'claude-sonnet-4',
-        tokens: usage ? { prompt: usage.promptTokens, completion: usage.completionTokens, total: usage.totalTokens } : undefined,
-        cost: usage?.cost,
-        metadata: { wizardName: result.classDef.name, prompt: prompt.slice(0, 200), quality },
-      });
-
       return result;
     }
     console.warn('LLM generation failed, falling back to templates');
