@@ -130,25 +130,35 @@ export function spawnEnemy(forceType = null, position = null, levelBoost = 0, xp
   const template = ENEMY_TYPES[type];
   if (!template) return;
   
-  // Scale enemy stats by zone level (exponential scaling for real zone difficulty)
-  // meadow(1): 1.8x, forest(2): 3.2x, volcanic(3): 5.8x, frozen(4): 10.5x, abyss(5): 18.9x
-  const scaleFactor = Math.pow(1.8, levelBoost);
+  // Scale enemy stats by zone level
+  // HP scales harder than damage so enemies are spongy but not one-shotting
+  // HP:  meadow(1): 1.45x, forest(2): 2.1x, volcanic(3): 3.05x, frozen(4): 4.42x, abyss(5): 6.41x
+  // Dmg: meadow(1): 1.35x, forest(2): 1.82x, volcanic(3): 2.46x, frozen(4): 3.32x, abyss(5): 4.48x
+  const hpScale = Math.pow(1.45, levelBoost);
+  const dmgScale = Math.pow(1.35, levelBoost);
   const xpMult = xpMultiplier || 1;
   
+  // === GOLDEN ENEMY VARIANT ===
+  // 4% chance for non-boss enemies to spawn as golden elite variants
+  // Golden enemies: 2.5x HP, 1.3x damage, 3x XP, golden glow, slightly larger
+  const isGolden = !template.isBoss && Math.random() < 0.04;
+  const goldenMult = isGolden ? { hp: 2.5, dmg: 1.3, xp: 3, radius: 1.25, speed: 0.85 } : { hp: 1, dmg: 1, xp: 1, radius: 1, speed: 1 };
+
   const enemy = {
     id,
     type,
-    name: template.name,
+    name: isGolden ? `Golden ${template.name}` : template.name,
     x: pos.x,
     y: pos.y,
-    health: Math.floor(template.health * scaleFactor),
-    maxHealth: Math.floor(template.health * scaleFactor),
-    damage: Math.floor(template.damage * scaleFactor),
-    speed: Math.floor(template.speed * (1 + levelBoost * 0.15)),
-    baseSpeed: Math.floor(template.speed * (1 + levelBoost * 0.15)),
-    radius: template.radius,
-    xp: Math.floor(template.xp * xpMult),
-    color: template.color,
+    health: Math.floor(template.health * hpScale * goldenMult.hp),
+    maxHealth: Math.floor(template.health * hpScale * goldenMult.hp),
+    damage: Math.floor(template.damage * dmgScale * goldenMult.dmg),
+    speed: Math.floor(template.speed * (1 + levelBoost * 0.08) * goldenMult.speed),
+    baseSpeed: Math.floor(template.speed * (1 + levelBoost * 0.08) * goldenMult.speed),
+    radius: Math.floor(template.radius * goldenMult.radius),
+    xp: Math.floor(template.xp * xpMult * goldenMult.xp),
+    color: isGolden ? '#ffd700' : template.color,
+    originalColor: template.color,
     behavior: template.behavior || 'chase',
     slowedUntil: 0,
     frozenUntil: 0,
@@ -160,6 +170,7 @@ export function spawnEnemy(forceType = null, position = null, levelBoost = 0, xp
     revealed: template.behavior !== 'ambush',
     resistant: template.resistant || [],
     isBoss: template.isBoss || false,
+    isGolden: isGolden,
     zone: zone?.id,
     aggroRange: 400 + (levelBoost * 50), // Higher zones = more aggressive chase range
   };
@@ -169,6 +180,19 @@ export function spawnEnemy(forceType = null, position = null, levelBoost = 0, xp
   // Announce boss spawn
   if (template.isBoss) {
     io.emit('bossSpawn', { type, name: template.name, zone: zone?.id });
+  }
+  
+  // Announce golden enemy to nearby players
+  if (isGolden) {
+    for (const player of gameState.players.values()) {
+      if (player.health <= 0) continue;
+      const d = Math.sqrt((player.x - pos.x) ** 2 + (player.y - pos.y) ** 2);
+      if (d < 1200) {
+        io.to(player.socketId).emit('goldenSpawn', { 
+          enemyId: id, name: enemy.name, x: pos.x, y: pos.y, zone: zone?.id,
+        });
+      }
+    }
   }
   
   return id;
@@ -445,124 +469,130 @@ export function onBossDeath(enemy, killer) {
 // BOSS DROP TABLES
 // ===========================================
 function calculateBossDrops(bossType, playerClass) {
+  // Tier 1 (Meadow/Crystal) → Uncommon drops, 20% chance
+  // Tier 2 (Forest) → Rare drops, 15% chance
+  // Tier 3 (Volcanic) → Rare/Epic drops, 12% chance
+  // Tier 4 (Frozen) → Epic drops, 10% chance
+  // Tier 5 (Abyss) → Epic/Legendary drops, 8% chance
+  
   const BOSS_DROP_TABLES = {
-    blossom_behemoth: {
-      guaranteedXp: 400,
-      drops: [
-        { item: 'blazing_speed', chance: 0.2, class: 'pyromancer' },
-        { item: 'permafrost', chance: 0.2, class: 'cryomancer' },
-        { item: 'mana_surge', chance: 0.2, class: 'arcanist' },
-      ],
-    },
-    ancient_treant: {
-      guaranteedXp: 600,
-      drops: [
-        { item: 'inferno_core', chance: 0.15, class: 'pyromancer' },
-        { item: 'glacial_shards', chance: 0.15, class: 'cryomancer' },
-        { item: 'void_touched', chance: 0.15, class: 'arcanist' },
-      ],
-    },
-    magma_titan: {
-      guaranteedXp: 1000,
-      drops: [
-        { item: 'phoenix_flame', chance: 0.1, class: 'pyromancer' },
-        { item: 'absolute_zero', chance: 0.08, class: 'cryomancer' },
-        { item: 'reality_tear', chance: 0.08, class: 'arcanist' },
-      ],
-    },
-    frost_wyrm: {
-      guaranteedXp: 1200,
-      drops: [
-        { item: 'dragons_breath', chance: 0.08, class: 'pyromancer' },
-        { item: 'ice_lance', chance: 0.1, class: 'cryomancer' },
-        { item: 'blink', chance: 0.1, class: 'arcanist' },
-      ],
-    },
-    void_overlord: {
-      guaranteedXp: 2000,
-      drops: [
-        { item: 'living_bomb', chance: 0.1, class: 'pyromancer' },
-        { item: 'frost_armor', chance: 0.1, class: 'cryomancer' },
-        { item: 'arcane_orb', chance: 0.1, class: 'arcanist' },
-      ],
-    },
-    crystal_golem: {
-      guaranteedXp: 500,
-      drops: [
-        { item: 'blazing_speed', chance: 0.15, class: 'pyromancer' },
-        { item: 'permafrost', chance: 0.15, class: 'cryomancer' },
-        { item: 'mana_surge', chance: 0.15, class: 'arcanist' },
-      ],
-    },
     boss_meadow: {
-      guaranteedXp: 400,
-      drops: [
-        { item: 'blazing_speed', chance: 0.2, class: 'pyromancer' },
-        { item: 'permafrost', chance: 0.2, class: 'cryomancer' },
-        { item: 'mana_surge', chance: 0.2, class: 'arcanist' },
-      ],
-    },
-    boss_forest: {
       guaranteedXp: 600,
       drops: [
-        { item: 'inferno_core', chance: 0.15, class: 'pyromancer' },
-        { item: 'glacial_shards', chance: 0.15, class: 'cryomancer' },
-        { item: 'void_touched', chance: 0.15, class: 'arcanist' },
-      ],
-    },
-    boss_volcanic: {
-      guaranteedXp: 1000,
-      drops: [
-        { item: 'phoenix_flame', chance: 0.1, class: 'pyromancer' },
-        { item: 'absolute_zero', chance: 0.08, class: 'cryomancer' },
-        { item: 'reality_tear', chance: 0.08, class: 'arcanist' },
-      ],
-    },
-    boss_frozen: {
-      guaranteedXp: 1200,
-      drops: [
-        { item: 'dragons_breath', chance: 0.08, class: 'pyromancer' },
-        { item: 'ice_lance', chance: 0.1, class: 'cryomancer' },
-        { item: 'blink', chance: 0.1, class: 'arcanist' },
-      ],
-    },
-    boss_abyss: {
-      guaranteedXp: 2000,
-      drops: [
-        { item: 'living_bomb', chance: 0.1, class: 'pyromancer' },
-        { item: 'frost_armor', chance: 0.1, class: 'cryomancer' },
-        { item: 'arcane_orb', chance: 0.1, class: 'arcanist' },
+        { item: 'blazing_speed', chance: 0.20, class: 'pyromancer' },
+        { item: 'permafrost', chance: 0.20, class: 'cryomancer' },
+        { item: 'mana_surge', chance: 0.20, class: 'arcanist' },
+        { item: 'void_siphon', chance: 0.20, class: 'voidlord' },
+        { item: 'barbed_arrows', chance: 0.20, class: 'shadowarcher' },
+        { item: 'iron_fists', chance: 0.20, class: 'brute' },
+        { item: 'keen_edge', chance: 0.20, class: 'swordsman' },
       ],
     },
     boss_crystal: {
-      guaranteedXp: 500,
+      guaranteedXp: 800,
       drops: [
-        { item: 'blazing_speed', chance: 0.15, class: 'pyromancer' },
-        { item: 'permafrost', chance: 0.15, class: 'cryomancer' },
-        { item: 'mana_surge', chance: 0.15, class: 'arcanist' },
+        { item: 'blazing_speed', chance: 0.18, class: 'pyromancer' },
+        { item: 'permafrost', chance: 0.18, class: 'cryomancer' },
+        { item: 'mana_surge', chance: 0.18, class: 'arcanist' },
+        { item: 'void_siphon', chance: 0.18, class: 'voidlord' },
+        { item: 'barbed_arrows', chance: 0.18, class: 'shadowarcher' },
+        { item: 'iron_fists', chance: 0.18, class: 'brute' },
+        { item: 'keen_edge', chance: 0.18, class: 'swordsman' },
+      ],
+    },
+    boss_forest: {
+      guaranteedXp: 1000,
+      drops: [
+        { item: 'inferno_core', chance: 0.15, class: 'pyromancer' },
+        { item: 'glacial_shards', chance: 0.15, class: 'cryomancer' },
+        { item: 'void_touched', chance: 0.15, class: 'arcanist' },
+        { item: 'entropy_bolt', chance: 0.15, class: 'voidlord' },
+        { item: 'shadow_quiver', chance: 0.15, class: 'shadowarcher' },
+        { item: 'protein_overflow', chance: 0.15, class: 'brute' },
+        { item: 'vorpal_blade', chance: 0.15, class: 'swordsman' },
+      ],
+    },
+    boss_volcanic: {
+      guaranteedXp: 1500,
+      drops: [
+        { item: 'phoenix_flame', chance: 0.12, class: 'pyromancer' },
+        { item: 'absolute_zero', chance: 0.12, class: 'cryomancer' },
+        { item: 'reality_tear', chance: 0.12, class: 'arcanist' },
+        { item: 'void_eruption', chance: 0.12, class: 'voidlord' },
+        { item: 'phantom_arrow', chance: 0.12, class: 'shadowarcher' },
+        { item: 'seismic_slam', chance: 0.12, class: 'brute' },
+        { item: 'dancing_blades', chance: 0.12, class: 'swordsman' },
+      ],
+    },
+    boss_frozen: {
+      guaranteedXp: 2000,
+      drops: [
+        { item: 'dragons_breath', chance: 0.10, class: 'pyromancer' },
+        { item: 'ice_lance_drop', chance: 0.10, class: 'cryomancer' },
+        { item: 'arcane_orb', chance: 0.10, class: 'arcanist' },
+        { item: 'soul_harvest', chance: 0.10, class: 'voidlord' },
+        { item: 'death_mark', chance: 0.10, class: 'shadowarcher' },
+        { item: 'unstoppable_force', chance: 0.10, class: 'brute' },
+        { item: 'blade_fury', chance: 0.10, class: 'swordsman' },
+      ],
+    },
+    boss_abyss: {
+      guaranteedXp: 3000,
+      drops: [
+        { item: 'living_bomb', chance: 0.08, class: 'pyromancer' },
+        { item: 'frost_armor', chance: 0.08, class: 'cryomancer' },
+        { item: 'time_rift', chance: 0.08, class: 'arcanist' },
+        { item: 'oblivion', chance: 0.08, class: 'voidlord' },
+        { item: 'eclipse_arrow', chance: 0.08, class: 'shadowarcher' },
+        { item: 'titan_grip', chance: 0.08, class: 'brute' },
+        { item: 'soul_cleaver', chance: 0.08, class: 'swordsman' },
       ],
     },
   };
   
   const SPELL_UPGRADES = {
-    // Pyromancer
+    // === PYROMANCER ===
     blazing_speed: { id: 'blazing_speed', name: 'Blazing Speed', description: 'Fireballs travel 50% faster and pierce one enemy', rarity: 'uncommon', spell: 'fireball' },
     inferno_core: { id: 'inferno_core', name: 'Inferno Core', description: 'Fireballs explode on impact dealing area damage', rarity: 'rare', spell: 'fireball' },
     phoenix_flame: { id: 'phoenix_flame', name: 'Phoenix Flame', description: 'Meteors leave burning ground that damages over time', rarity: 'epic', spell: 'meteor' },
     dragons_breath: { id: 'dragons_breath', name: "Dragon's Breath", description: 'Breathe a continuous stream of fire (alternate spell)', rarity: 'epic', replacesSlot: 'primary' },
-    living_bomb: { id: 'living_bomb', name: 'Living Bomb', description: 'Mark an enemy to explode after 3 seconds', rarity: 'rare', replacesSlot: 'secondary' },
-    // Cryomancer
+    living_bomb: { id: 'living_bomb', name: 'Living Bomb', description: 'Mark an enemy to explode after 3 seconds', rarity: 'legendary', replacesSlot: 'secondary' },
+    // === CRYOMANCER ===
     permafrost: { id: 'permafrost', name: 'Permafrost', description: 'Frostbolts have 20% chance to freeze enemies solid', rarity: 'uncommon', spell: 'frostbolt' },
     glacial_shards: { id: 'glacial_shards', name: 'Glacial Shards', description: 'Frostbolts split into 3 smaller shards on impact', rarity: 'rare', spell: 'frostbolt' },
-    absolute_zero: { id: 'absolute_zero', name: 'Absolute Zero', description: 'Ice Nova freezes 2x longer and shatters frozen enemies', rarity: 'legendary', spell: 'ice_nova' },
-    ice_lance: { id: 'ice_lance', name: 'Ice Lance', description: 'Pierce all enemies, bonus damage to frozen targets', rarity: 'epic', replacesSlot: 'primary' },
-    frost_armor: { id: 'frost_armor', name: 'Frost Armor', description: 'Ice shield reduces damage and freezes attackers', rarity: 'rare', replacesSlot: 'secondary' },
-    // Arcanist
-    mana_surge: { id: 'mana_surge', name: 'Mana Surge', description: 'Every 5th Arcane Missile deals triple damage', rarity: 'uncommon', spell: 'arcane_missile' },
-    void_touched: { id: 'void_touched', name: 'Void Touched', description: 'Arcane Missiles home in on enemies', rarity: 'rare', spell: 'arcane_missile' },
-    reality_tear: { id: 'reality_tear', name: 'Reality Tear', description: 'Arcane Storm creates a black hole vortex', rarity: 'legendary', spell: 'arcane_storm' },
-    arcane_orb: { id: 'arcane_orb', name: 'Arcane Orb', description: 'Slow-moving orb that deals massive damage', rarity: 'epic', replacesSlot: 'primary' },
-    blink: { id: 'blink', name: 'Blink', description: 'Teleport short distance leaving damaging afterimages', rarity: 'rare', replacesSlot: 'secondary' },
+    absolute_zero: { id: 'absolute_zero', name: 'Absolute Zero', description: 'Blizzard freezes 2x longer and shatters frozen enemies', rarity: 'epic', spell: 'blizzard' },
+    ice_lance_drop: { id: 'ice_lance_drop', name: 'Ice Lance', description: 'Pierce all enemies with massive ice shard, bonus vs frozen', rarity: 'epic', replacesSlot: 'primary' },
+    frost_armor: { id: 'frost_armor', name: 'Frost Armor', description: 'Ice shield reduces damage taken by 25% for 8 seconds', rarity: 'legendary', replacesSlot: 'secondary' },
+    // === ARCANIST ===
+    mana_surge: { id: 'mana_surge', name: 'Mana Surge', description: 'Every 5th Magic Missile deals triple damage', rarity: 'uncommon', spell: 'magicMissile' },
+    void_touched: { id: 'void_touched', name: 'Void Touched', description: 'Magic Missiles gain stronger homing and +20% damage', rarity: 'rare', spell: 'magicMissile' },
+    reality_tear: { id: 'reality_tear', name: 'Reality Tear', description: 'Arcane Blasts pull enemies inward before detonating', rarity: 'epic', spell: 'arcaneBlast' },
+    arcane_orb: { id: 'arcane_orb', name: 'Arcane Orb', description: 'Slow-moving orb that deals massive damage and pierces all', rarity: 'epic', replacesSlot: 'primary' },
+    time_rift: { id: 'time_rift', name: 'Time Rift', description: 'Slow time in an area — enemies move at 30% speed for 5s', rarity: 'legendary', replacesSlot: 'secondary' },
+    // === VOID LORD ===
+    void_siphon: { id: 'void_siphon', name: 'Void Siphon', description: 'Void Bolts heal you for 10% of damage dealt', rarity: 'uncommon', spell: 'voidBolt' },
+    entropy_bolt: { id: 'entropy_bolt', name: 'Entropy Bolt', description: 'Void Bolts leave a lingering damage field on impact', rarity: 'rare', spell: 'voidBolt' },
+    void_eruption: { id: 'void_eruption', name: 'Void Eruption', description: 'Annihilate pulls enemies to center before detonating', rarity: 'epic', spell: 'annihilate' },
+    soul_harvest: { id: 'soul_harvest', name: 'Soul Harvest', description: 'Each kill grants a stacking damage buff (+5%, max 50%)', rarity: 'epic', replacesSlot: 'primary' },
+    oblivion: { id: 'oblivion', name: 'Oblivion', description: 'Banish all enemies in range to the void for 3s, dealing massive damage on return', rarity: 'legendary', replacesSlot: 'secondary' },
+    // === SHADOW ARCHER ===
+    barbed_arrows: { id: 'barbed_arrows', name: 'Barbed Arrows', description: 'Shadow Arrows inflict bleed dealing 30% bonus damage over 3s', rarity: 'uncommon', spell: 'shadowArrow' },
+    shadow_quiver: { id: 'shadow_quiver', name: 'Shadow Quiver', description: 'Shadow Arrows fire 2 at once in a tight spread', rarity: 'rare', spell: 'shadowArrow' },
+    phantom_arrow: { id: 'phantom_arrow', name: 'Phantom Arrow', description: 'Piercing Volley fires ghost arrows that bounce between enemies', rarity: 'epic', spell: 'piercingVolley' },
+    death_mark: { id: 'death_mark', name: 'Death Mark', description: 'Mark a target — all attacks deal 2x damage to marked enemy for 5s', rarity: 'epic', replacesSlot: 'primary' },
+    eclipse_arrow: { id: 'eclipse_arrow', name: 'Eclipse Arrow', description: 'Fire an arrow that creates a black hole on impact, pulling and damaging', rarity: 'legendary', replacesSlot: 'secondary' },
+    // === THE BRUTE ===
+    iron_fists: { id: 'iron_fists', name: 'Iron Fists', description: 'Dumbbells deal 25% more damage and stun briefly', rarity: 'uncommon', spell: 'dumbbellThrow' },
+    protein_overflow: { id: 'protein_overflow', name: 'Protein Overflow', description: 'Ground Pound radius +40% and leaves a tremor zone', rarity: 'rare', spell: 'groundPound' },
+    seismic_slam: { id: 'seismic_slam', name: 'Seismic Slam', description: 'Ground Pound sends shockwaves outward in 4 directions', rarity: 'epic', spell: 'groundPound' },
+    unstoppable_force: { id: 'unstoppable_force', name: 'Unstoppable Force', description: 'Shoulder Charge deals 3x damage and is 50% longer', rarity: 'epic', replacesSlot: 'primary' },
+    titan_grip: { id: 'titan_grip', name: 'Titan Grip', description: 'GAINS MODE lasts 50% longer and grants temporary invulnerability', rarity: 'legendary', replacesSlot: 'secondary' },
+    // === SWORDSMAN ===
+    keen_edge: { id: 'keen_edge', name: 'Keen Edge', description: 'Dagger Throws have 15% chance to critically strike for 2x damage', rarity: 'uncommon', spell: 'daggerThrow' },
+    vorpal_blade: { id: 'vorpal_blade', name: 'Vorpal Blade', description: 'Axe Hurl bounces between up to 3 enemies', rarity: 'rare', spell: 'axeHurl' },
+    dancing_blades: { id: 'dancing_blades', name: 'Dancing Blades', description: 'Blade Rush leaves spinning blades that damage for 3 seconds', rarity: 'epic', spell: 'bladeRush' },
+    blade_fury: { id: 'blade_fury', name: 'Blade Fury', description: 'Throw 5 daggers in a fan pattern that each pierce enemies', rarity: 'epic', replacesSlot: 'primary' },
+    soul_cleaver: { id: 'soul_cleaver', name: 'Soul Cleaver', description: 'Whirlwind Slash heals 5% of total damage dealt', rarity: 'legendary', replacesSlot: 'secondary' },
   };
   
   const dropTable = BOSS_DROP_TABLES[bossType];

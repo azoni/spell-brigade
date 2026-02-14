@@ -27,6 +27,22 @@ The spell NAMES and DESCRIPTIONS must directly reference the player's concept. G
 - 1 ultimate ability (Q) — big cooldown, big impact
 - Spells: PROJECTILE (travels toward target) or AOE (instant area damage, speed=0)
 
+## ABILITY STYLES (pick the BEST fit for each slot)
+Each ability has a "style" that determines HOW it executes:
+- "burst" — instant AOE damage around player (Lv10 default)
+- "targeted" — delayed AOE at cursor position with warning circle (Lv20 default)
+- "sustained" — pulsing damage over duration around player (Lv30 default)
+- "buff" — grants temporary stat boost (speed, damage, defense). Set damage=0, use duration for buff length
+- "shield" — absorbs incoming damage for duration. Set damage=0
+- "heal" — restores HP and grants brief regen. damage = heal amount
+- "summon" — spawns temporary allied minions that chase enemies. damage = per-minion damage, radius = minion count (2-5)
+- "transform" — temporary form change with stat boost + damage aura. damage = aura tick damage
+
+Mix it up! Don't make all 3 abilities just "burst damage AOE". The BEST classes have variety:
+- A necromancer might have: burst (soul rip), summon (raise undead), sustained (death aura)
+- A paladin might have: shield (divine barrier), buff (holy wrath - damage boost), targeted (smite)
+- A berserker might have: buff (rage - speed+damage), burst (ground slam), transform (beast form)
+
 ## REAL CLASSES FOR BALANCE REFERENCE
 
 Pyromancer (glass cannon): HP 80, Speed 195
@@ -101,19 +117,19 @@ Shadow Archer (fragile sniper): HP 75, Speed 200
     "specialEffect": "none|slow|piercing|homing"
   },
   "ability1": {
-    "name": "Lv10 ability", "type": "aoe",
+    "name": "Lv10 ability", "style": "burst|buff|shield|summon",
     "damage": 15-40, "cooldown": 8000-14000,
     "radius": 80-160, "duration": 2000-5000,
     "description": "What it does"
   },
   "ability2": {
-    "name": "Lv20 ability", "type": "aoe",
+    "name": "Lv20 ability", "style": "targeted|buff|summon|sustained",
     "damage": 40-80, "cooldown": 14000-20000,
     "radius": 100-200, "duration": 2000-5000,
     "description": "What it does"
   },
   "ability3": {
-    "name": "Lv30 ability (devastating)", "type": "aoe",
+    "name": "Lv30 ability (devastating)", "style": "sustained|transform|targeted|summon",
     "damage": 100-160, "cooldown": 35000-50000,
     "radius": 180-280, "duration": 3000-8000,
     "description": "What it does"
@@ -284,26 +300,33 @@ function clampSpell(spellData, index, classColor) {
 function clampAbility(abilityData, slot, classId, color) {
   const C = CLAMP.ability[slot];
   const fallbackNames = { 1: 'Power Strike', 2: 'Energy Burst', 3: 'Cataclysm' };
-  // Each slot gets a distinct execution style
-  const styles = { 1: 'burst', 2: 'targeted', 3: 'sustained' };
+  // Each slot gets a default style but LLM can override
+  const defaultStyles = { 1: 'burst', 2: 'targeted', 3: 'sustained' };
+  const VALID_STYLES = ['burst', 'targeted', 'sustained', 'buff', 'shield', 'summon', 'transform', 'heal', 'buff_speed', 'buff_damage'];
   
   if (!abilityData || typeof abilityData !== 'object') {
     return {
       id: `custom_ability${slot}_${classId}`, name: fallbackNames[slot],
       damage: C.damage[0], cooldown: C.cooldown[0], radius: C.radius[0], duration: C.duration[0],
-      color, isAoe: true, type: 'classAbility', style: styles[slot],
+      color, isAoe: true, type: 'classAbility', style: defaultStyles[slot],
     };
   }
+
+  const style = VALID_STYLES.includes(abilityData.style) ? abilityData.style : defaultStyles[slot];
+  
+  // For buff/shield/heal/buff_speed/buff_damage: damage can be 0 (it's a utility ability)
+  const isUtility = ['buff', 'shield', 'heal', 'buff_speed', 'buff_damage'].includes(style);
+  const minDamage = isUtility ? 0 : C.damage[0];
 
   return {
     id: `custom_ability${slot}_${classId}`,
     name: (typeof abilityData.name === 'string' ? abilityData.name : fallbackNames[slot]).slice(0, 30),
-    damage: clamp(abilityData.damage, C.damage[0], C.damage[1]),
+    damage: clamp(abilityData.damage, minDamage, C.damage[1]),
     cooldown: clamp(abilityData.cooldown, C.cooldown[0], C.cooldown[1]),
     radius: clamp(abilityData.radius, C.radius[0], C.radius[1]),
     duration: clamp(abilityData.duration, C.duration[0], C.duration[1]),
     color: isValidHex(abilityData.color) ? abilityData.color : color,
-    isAoe: true, type: 'classAbility', style: styles[slot],
+    isAoe: true, type: 'classAbility', style,
     description: (typeof abilityData.description === 'string' ? abilityData.description : '').slice(0, 100),
   };
 }
@@ -426,7 +449,7 @@ const TEMPLATES = [
     spell1: { name: 'Flame Lance', type: 'projectile', damage: 30, cooldown: 900, range: 320, speed: 550, radius: 10, color: '#ff4500', trailColor: '#ffd700', specialEffect: 'none', description: 'A searing lance of fire' },
     spell2: { name: 'Inferno Ring', type: 'aoe', damage: 22, cooldown: 2200, range: 200, speed: 0, radius: 130, color: '#ff6600', specialEffect: 'none', description: 'Ring of fire erupts around you' },
     ability1: { name: 'Pyroclasm', type: 'aoe', damage: 35, cooldown: 10000, radius: 120, duration: 2500, description: 'Volcanic eruption at your feet' },
-    ability2: { name: 'Molten Armor', type: 'aoe', damage: 55, cooldown: 16000, radius: 150, duration: 4000, description: 'Coat yourself in magma, burning nearby enemies' },
+    ability2: { name: 'Molten Armor', style: 'shield', damage: 0, cooldown: 16000, radius: 150, duration: 6000, description: 'Coat yourself in magma armor that absorbs damage' },
     ability3: { name: 'Firestorm', type: 'aoe', damage: 130, cooldown: 42000, radius: 240, duration: 5000, description: 'Rain fire from the sky, devastating everything' },
     dash: { name: 'Flame Dash', description: 'Dash forward trailing fire.', cooldown: 4000, distance: 200 },
     ult: { name: 'Phoenix Burst', description: 'Erupt in a phoenix-shaped explosion.', cooldown: 22000, damage: 90, radius: 180 },
@@ -440,7 +463,7 @@ const TEMPLATES = [
     spell1: { name: 'Ice Shard', type: 'projectile', damage: 20, cooldown: 600, range: 300, speed: 600, radius: 9, color: '#00d4ff', trailColor: '#e0f7ff', specialEffect: 'slow', description: 'Razor-sharp ice that slows on hit' },
     spell2: { name: 'Glacial Burst', type: 'aoe', damage: 16, cooldown: 2000, range: 200, speed: 0, radius: 140, color: '#88e0ff', specialEffect: 'slow', description: 'Freezing explosion around you' },
     ability1: { name: 'Frozen Spike', type: 'aoe', damage: 30, cooldown: 9000, radius: 100, duration: 2000, description: 'Summon a massive ice spike' },
-    ability2: { name: 'Permafrost', type: 'aoe', damage: 55, cooldown: 16000, radius: 160, duration: 3500, description: 'Freeze the ground, trapping enemies' },
+    ability2: { name: 'Frost Elementals', style: 'summon', damage: 55, cooldown: 16000, radius: 120, duration: 10000, description: 'Summon ice elemental allies to freeze enemies' },
     ability3: { name: 'Absolute Zero', type: 'aoe', damage: 120, cooldown: 40000, radius: 220, duration: 6000, description: 'Drop temperature to absolute zero' },
     dash: { name: 'Ice Slide', description: 'Glide on ice leaving a frozen trail.', cooldown: 3500, distance: 200 },
     ult: { name: 'Blizzard Wrath', description: 'Summon a devastating blizzard.', cooldown: 20000, damage: 75, radius: 200 },
@@ -454,8 +477,8 @@ const TEMPLATES = [
     spell1: { name: 'Void Bolt', type: 'projectile', damage: 28, cooldown: 850, range: 280, speed: 520, radius: 11, color: '#8b00ff', trailColor: '#cc66ff', specialEffect: 'none', description: 'A bolt of pure void energy' },
     spell2: { name: 'Shadow Pool', type: 'aoe', damage: 20, cooldown: 2400, range: 220, speed: 0, radius: 120, color: '#6600cc', specialEffect: 'slow', description: 'Pool of darkness that slows enemies' },
     ability1: { name: 'Soul Rend', type: 'aoe', damage: 35, cooldown: 10000, radius: 110, duration: 2000, description: 'Rip the soul from nearby enemies' },
-    ability2: { name: 'Void Eruption', type: 'aoe', damage: 60, cooldown: 16000, radius: 170, duration: 3000, description: 'The void erupts in a devastating blast' },
-    ability3: { name: 'Eclipse', type: 'aoe', damage: 130, cooldown: 42000, radius: 250, duration: 5000, description: 'Plunge the area into total darkness' },
+    ability2: { name: 'Void Eruption', style: 'transform', damage: 60, cooldown: 16000, radius: 170, duration: 6000, description: 'Become one with the void — damage aura and stat boost' },
+    ability3: { name: 'Eclipse', style: 'transform', damage: 130, cooldown: 42000, radius: 250, duration: 8000, description: 'Transform into a void being with a devastating dark aura' },
     dash: { name: 'Shadow Step', description: 'Vanish into shadow, reappear ahead.', cooldown: 4500, distance: 220 },
     ult: { name: 'Abyssal Rift', description: 'Tear open a rift to the abyss.', cooldown: 24000, damage: 100, radius: 190 },
     baseHealth: 88, baseSpeed: 186,
@@ -467,8 +490,8 @@ const TEMPLATES = [
     lore: 'Blessed by celestial forces, Radiant Clerics smite darkness with purifying radiance.',
     spell1: { name: 'Holy Lance', type: 'projectile', damage: 26, cooldown: 800, range: 310, speed: 580, radius: 10, color: '#ffd700', trailColor: '#fffacd', specialEffect: 'none', description: 'A spear of divine light' },
     spell2: { name: 'Sanctify', type: 'aoe', damage: 18, cooldown: 2000, range: 200, speed: 0, radius: 135, color: '#ffee88', specialEffect: 'none', description: 'Purifying burst of holy energy' },
-    ability1: { name: 'Smite', type: 'aoe', damage: 32, cooldown: 9000, radius: 100, duration: 2000, description: 'Channel divine wrath' },
-    ability2: { name: 'Divine Judgment', type: 'aoe', damage: 58, cooldown: 16000, radius: 160, duration: 3500, description: 'Judge the unworthy with holy fire' },
+    ability1: { name: 'Holy Fervor', style: 'buff_damage', damage: 0, cooldown: 9000, radius: 100, duration: 6000, description: 'Divine energy boosts your damage output' },
+    ability2: { name: 'Divine Judgment', style: 'heal', damage: 45, cooldown: 14000, radius: 160, duration: 5000, description: 'Holy light heals you and burns the unworthy' },
     ability3: { name: 'Solar Flare', type: 'aoe', damage: 125, cooldown: 42000, radius: 240, duration: 4500, description: 'Unleash the full power of the sun' },
     dash: { name: 'Flash of Light', description: 'Teleport in a flash of radiance.', cooldown: 3800, distance: 210 },
     ult: { name: 'Celestial Wrath', description: 'Call down divine judgment.', cooldown: 21000, damage: 85, radius: 185 },
@@ -481,8 +504,8 @@ const TEMPLATES = [
     lore: 'Stoneshapers commune with the earth itself, raising boulders and splitting the ground.',
     spell1: { name: 'Boulder Toss', type: 'projectile', damage: 35, cooldown: 1200, range: 260, speed: 420, radius: 14, color: '#8b6914', trailColor: '#d4a856', specialEffect: 'none', description: 'Hurl a massive boulder' },
     spell2: { name: 'Seismic Slam', type: 'aoe', damage: 25, cooldown: 2500, range: 180, speed: 0, radius: 150, color: '#a0855c', specialEffect: 'slow', description: 'Slam the ground, cracking earth' },
-    ability1: { name: 'Rock Wall', type: 'aoe', damage: 28, cooldown: 10000, radius: 130, duration: 3000, description: 'Raise a wall of stone' },
-    ability2: { name: 'Tectonic Surge', type: 'aoe', damage: 60, cooldown: 18000, radius: 180, duration: 4000, description: 'Unleash seismic force from below' },
+    ability1: { name: 'Rock Wall', style: 'shield', damage: 0, cooldown: 10000, radius: 130, duration: 5000, description: 'Raise a protective wall of stone around you' },
+    ability2: { name: 'Tectonic Surge', style: 'buff', damage: 0, cooldown: 16000, radius: 180, duration: 8000, description: 'Channel earth energy for massive speed and damage boost' },
     ability3: { name: 'Earthquake', type: 'aoe', damage: 140, cooldown: 45000, radius: 260, duration: 6000, description: 'Devastating earthquake levels everything' },
     dash: { name: 'Stone Charge', description: 'Charge through earth with rocky force.', cooldown: 5000, distance: 180 },
     ult: { name: 'Mountain Fall', description: 'Drop a massive boulder.', cooldown: 25000, damage: 110, radius: 200 },
@@ -510,7 +533,7 @@ const TEMPLATES = [
     spell1: { name: 'Thorn Spike', type: 'projectile', damage: 22, cooldown: 700, range: 290, speed: 550, radius: 9, color: '#228b22', trailColor: '#90ee90', specialEffect: 'slow', description: 'A venomous thorn that slows' },
     spell2: { name: 'Spore Cloud', type: 'aoe', damage: 14, cooldown: 2100, range: 200, speed: 0, radius: 140, color: '#44bb44', specialEffect: 'slow', description: 'Toxic spore cloud around you' },
     ability1: { name: 'Bramble Trap', type: 'aoe', damage: 25, cooldown: 9000, radius: 120, duration: 3000, description: 'Thorny brambles entangle enemies' },
-    ability2: { name: 'Overgrowth', type: 'aoe', damage: 50, cooldown: 16000, radius: 160, duration: 4000, description: 'Nature explodes in wild growth' },
+    ability2: { name: 'Overgrowth', style: 'summon', damage: 50, cooldown: 16000, radius: 120, duration: 8000, description: 'Summon living treant allies to fight for you' },
     ability3: { name: 'Wrath of Nature', type: 'aoe', damage: 130, cooldown: 42000, radius: 250, duration: 5500, description: 'Unleash nature\'s full devastation' },
     dash: { name: 'Vine Leap', description: 'Leap forward on a vine.', cooldown: 4000, distance: 210 },
     ult: { name: 'Verdant Storm', description: 'Storm of thorns and vines.', cooldown: 22000, damage: 80, radius: 190 },
@@ -523,9 +546,9 @@ const TEMPLATES = [
     lore: 'Bloodmancers siphon vitality from enemies to fuel their dark power.',
     spell1: { name: 'Blood Bolt', type: 'projectile', damage: 25, cooldown: 750, range: 300, speed: 530, radius: 10, color: '#8b0000', trailColor: '#ff4444', specialEffect: 'none', description: 'A bolt of crystallized blood' },
     spell2: { name: 'Crimson Wave', type: 'aoe', damage: 19, cooldown: 2300, range: 200, speed: 0, radius: 130, color: '#cc0000', specialEffect: 'none', description: 'Wave of blood magic around you' },
-    ability1: { name: 'Life Drain', type: 'aoe', damage: 33, cooldown: 10000, radius: 110, duration: 2500, description: 'Drain life from nearby enemies' },
+    ability1: { name: 'Life Drain', style: 'heal', damage: 33, cooldown: 10000, radius: 110, duration: 5000, description: 'Drain life from enemies to heal yourself' },
     ability2: { name: 'Blood Nova', type: 'aoe', damage: 55, cooldown: 16000, radius: 170, duration: 3000, description: 'Explosive nova of blood energy' },
-    ability3: { name: 'Hemorrhage', type: 'aoe', damage: 125, cooldown: 42000, radius: 240, duration: 5500, description: 'Enemies bleed out violently' },
+    ability3: { name: 'Hemorrhage', style: 'transform', damage: 125, cooldown: 42000, radius: 240, duration: 8000, description: 'Transform into a blood avatar with devastating aura' },
     dash: { name: 'Blood Rush', description: 'Surge forward fueled by blood.', cooldown: 4200, distance: 210 },
     ult: { name: 'Sanguine Tide', description: 'Wave of blood magic devastates all.', cooldown: 23000, damage: 95, radius: 195 },
     baseHealth: 88, baseSpeed: 186,
@@ -537,7 +560,7 @@ const TEMPLATES = [
     lore: 'Chronomancers manipulate time itself, aging enemies to dust or rewinding wounds.',
     spell1: { name: 'Time Bolt', type: 'projectile', damage: 22, cooldown: 600, range: 320, speed: 650, radius: 8, color: '#c4a000', trailColor: '#f0e68c', specialEffect: 'slow', description: 'Bolt that slows the target\'s time' },
     spell2: { name: 'Temporal Rift', type: 'aoe', damage: 18, cooldown: 2200, range: 250, speed: 0, radius: 130, color: '#daa520', specialEffect: 'slow', description: 'Rift distorts time around you' },
-    ability1: { name: 'Haste Field', type: 'aoe', damage: 20, cooldown: 10000, radius: 100, duration: 4000, description: 'Accelerate time around you' },
+    ability1: { name: 'Haste Field', style: 'buff_speed', damage: 0, cooldown: 10000, radius: 100, duration: 6000, description: 'Accelerate time — massive speed boost' },
     ability2: { name: 'Age Warp', type: 'aoe', damage: 58, cooldown: 16000, radius: 140, duration: 3000, description: 'Age enemies rapidly' },
     ability3: { name: 'Time Stop', type: 'aoe', damage: 110, cooldown: 42000, radius: 220, duration: 4000, description: 'Freeze time, then shatter it' },
     dash: { name: 'Time Skip', description: 'Skip forward through time.', cooldown: 3500, distance: 230 },

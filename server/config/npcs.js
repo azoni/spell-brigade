@@ -14,13 +14,11 @@ export const NPCS = {
     interactRange: 80,
     stationary: true,
     greetings: [
-      "Welcome, traveler. The realm awaits your courage.",
-      "Ah, another brave soul. May the arcane guide your path.",
-      "Greetings, wizard. The sanctuary protects all who seek refuge.",
-      "The world beyond grows dark. Prepare yourself well.",
-      "I have watched countless heroes pass through. Will you be different?",
-      "The healing fountain at the center restores your strength. Use it wisely.",
-      "The portal hub will take you to any zone. But beware - some require great power.",
+      "The ley lines whisper of your deeds, traveler. What brings you to my vigil?",
+      "I have watched this Sanctuary since before the first stone was laid. Ask, and I shall guide you.",
+      "The balance shifts. Darkness presses at every border. But you... you carry a spark worth protecting.",
+      "Each wizard who passes through shapes the fate of these lands. What will your legacy be?",
+      "The healing fountain remembers all who drink from it. The portal hub connects all who are brave enough to travel.",
     ],
   },
   quest_master: {
@@ -35,21 +33,20 @@ export const NPCS = {
     stationary: true,
     dialogues: {
       initial: [
-        "Greetings, young wizard. I am Seraphina, keeper of quests.",
-        "The realm is threatened by powerful bosses in each zone.",
-        "Only by defeating them all can peace be restored.",
+        "You have the look of someone searching for purpose. I am Seraphina — I keep the ledger of this realm's unfinished business.",
+        "Six bosses hold dominion over the zones beyond. Each one a tyrant. Each one... killable.",
+        "No one has defeated them all. Not yet.",
       ],
       questOffer: [
-        "I have a task for you, if you're brave enough.",
-        "Six mighty bosses terrorize the lands: the Blossom Behemoth in the Meadow,",
-        "the Ancient Treant in the Forest, the Magma Titan in the Volcanic Wastes,",
-        "the Frost Wyrm in the Frozen Expanse, the Crystal Golem in the Crystal Caves,",
-        "and the Void Overlord in the Abyss.",
-        "Defeat them all, and you shall be known as Champion of the Realm!",
+        "Here is what stands between this world and peace:",
+        "The Blossom Behemoth chokes the Meadow. The Ancient Treant poisons the Forest.",
+        "The Magma Titan scorches the Volcanic Wastes. The Frost Wyrm freezes the northern passes.",
+        "The Crystal Golem guards power beyond measure. And in the deepest dark... the Void Overlord waits.",
+        "Bring me proof of their deaths. All six. Then this realm will know its first true Champion.",
       ],
-      questActive: "Your quest continues. Check your quest log to see your progress.",
-      questComplete: "Incredible! You have defeated all the bosses! You are truly a Champion!",
-      prompt: "Will you accept this quest?",
+      questActive: "The bosses still breathe. Check your quest log — and don't come back empty-handed.",
+      questComplete: "It's done. I... did not think I would live to see this day. You are the Champion of the Realm. Kneel for no one.",
+      prompt: "Will you hunt the six?",
     },
     quest: {
       id: 'allBosses',
@@ -70,19 +67,19 @@ export const NPCS = {
     stationary: true, // Stands guard near southeast
     dialogues: {
       initial: [
-        "Halt, wizard. I am Knight Commander Aldric.",
-        "I guard the passage to the Dragon's Gauntlet - a dungeon of unspeakable danger.",
-        "Many have entered. Few have returned.",
+        "Hold. I am Aldric. The door behind me leads to the Dragon's Gauntlet.",
+        "I've stood this post for eleven years. I've watched hundreds enter. I can count the survivors on one hand.",
+        "This is not a quest. This is a death sentence with a small chance of glory.",
       ],
       warning: [
-        "You seek to challenge the Infernal Dragon?",
-        "I would advise reaching at least level 30 before attempting such folly.",
-        "The creatures within grow stronger the deeper you venture.",
-        "At the end awaits the dragon itself... a beast of nightmares.",
+        "The Gauntlet is five chambers deep. Each one worse than the last.",
+        "Skeletal hordes. Flame sentinels. Mini-bosses that would be zone bosses anywhere else.",
+        "And at the bottom... the Infernal Dragon. It doesn't negotiate.",
+        "Level 30 at minimum. Anything less is suicide.",
       ],
-      prompt: "Do you wish to enter the Dragon's Gauntlet?",
-      tooWeak: "You are not ready. Return when you have grown stronger. (Recommended: Level 30)",
-      enter: "Very well. May your flames burn bright, wizard. Step through when ready.",
+      prompt: "Still want to go in?",
+      tooWeak: "No. Come back stronger. I won't send you to die. (Recommended: Level 30)",
+      enter: "... Brave or foolish. Either way — may your spells fly true. Step through.",
     },
   },
   shapeshifter: {
@@ -109,10 +106,10 @@ export const NPCS = {
     lastFormChange: 0,
     formChangeInterval: 15 * 60 * 1000, // 15 minutes
     greetings: [
-      "Ah, you see me as I am now... but in a moment, I could be anything.",
-      "Identity is fluid, young one. Would you like to change your appearance?",
-      "I have walked this world in a thousand forms. Perhaps you seek a new look?",
-      "The mirror shows what we choose to be. Let me help you reshape yourself.",
+      "Don't stare — yes, I changed again. It's what I do. Perhaps you'd like to try a new look yourself?",
+      "Form is temporary. Power is permanent. I can reshape your exterior if the current one bores you.",
+      "Ah, a visitor! Last one ran screaming when I shifted mid-sentence. You seem braver. Want a new appearance?",
+      "Identity is a costume, dear. I've worn thousands. Shall I tailor one for you?",
     ],
     skinPrompt: "Would you like to change your appearance?",
   },
@@ -128,10 +125,10 @@ export const NPCS = {
     stationary: true,
     emoji: '🏗️',
     greetings: [
-      "Ah, a visitor! I am Arcanus, weaver of pocket dimensions.",
-      "I can shape the fabric of reality into any dungeon you can imagine.",
-      "Describe your nightmare, and I shall build it for you to conquer.",
-      "Want to test your skills? I have dungeons crafted by other wizards too.",
+      "Reality is my clay and nightmares are my inspiration. Describe a challenge and I'll build it from nothing.",
+      "You want danger? I weave pocket dimensions — each one a death trap tailored to your description. Interested?",
+      "Every dungeon I've built still exists somewhere between dimensions. Some have challengers inside them right now. Want your own?",
+      "Most architects build walls. I build entire worlds. Tell me your worst fear and I'll make it fightable.",
     ],
   },
   hunt_master: {
@@ -145,9 +142,9 @@ export const NPCS = {
     interactRange: 80,
     stationary: true,
     greetings: [
-      "Hah! Another hunter? Good. The wilds need thinning.",
-      "You want to prove yourself? I've got bounties that need filling.",
-      "Kill enough beasts and I'll make it worth your while, warrior.",
+      "You smell like Sanctuary air. Soft. My bounties will fix that — if you survive them.",
+      "Every beast on that board has killed someone I trained. Don't add your name to the list.",
+      "Back for more? Good. The wilds don't thin themselves. Pick a bounty and make it bleed.",
     ],
   },
   herbalist: {
@@ -161,9 +158,9 @@ export const NPCS = {
     interactRange: 80,
     stationary: true,
     greetings: [
-      "Oh hello, dear! I'm Willow. I study the magical flora of these lands.",
-      "The zones are filled with rare reagents — if you could gather some for me...",
-      "Each herb has powerful properties. Bring them back and I'll brew something special!",
+      "Oh! Don't mind the mess — I'm mid-experiment. But if you're heading out, I could use some ingredients...",
+      "Every zone hides reagents that could save lives or end them. I prefer the former. Will you gather for me?",
+      "The flora of these lands holds more power than most wizards realize. Bring me samples and I'll prove it.",
     ],
   },
 };
@@ -172,23 +169,23 @@ export const NPCS = {
 // QUEST DEFINITIONS
 // ============================================
 export const HUNT_QUESTS = [
-  { id: 'hunt_slimes', name: 'Slime Slaughter', description: 'Defeat 30 Slimes in the Meadow.', target: 'slime', zone: 'meadow', required: 30, reward: { maxHealth: 10 }, rewardText: '+10 Max HP', tier: 1 },
-  { id: 'hunt_bats', name: 'Bat Purge', description: 'Defeat 25 Bats in the Meadow.', target: 'bat', zone: 'meadow', required: 25, reward: { speed: 5 }, rewardText: '+5 Speed', tier: 1 },
-  { id: 'hunt_skeletons', name: 'Bone Collector', description: 'Defeat 25 Skeletons in the Forest.', target: 'skeleton', zone: 'forest', required: 25, reward: { damagePercent: 5 }, rewardText: '+5% Damage', tier: 2 },
-  { id: 'hunt_wolves', name: 'Wolf Cull', description: 'Defeat 20 Wolves in the Forest.', target: 'wolf', zone: 'forest', required: 20, reward: { maxHealth: 15 }, rewardText: '+15 Max HP', tier: 2 },
-  { id: 'hunt_fire_imps', name: 'Imp Exterminator', description: 'Defeat 20 Fire Imps in the Volcanic Wastes.', target: 'fire_imp', zone: 'volcanic', required: 20, reward: { maxHealth: 15, speed: 5 }, rewardText: '+15 Max HP, +5 Speed', tier: 3 },
-  { id: 'hunt_yetis', name: 'Yeti Hunter', description: 'Defeat 15 Yetis in the Frozen Expanse.', target: 'yeti', zone: 'frozen', required: 15, reward: { maxHealth: 20 }, rewardText: '+20 Max HP', tier: 4 },
-  { id: 'hunt_demons', name: 'Demon Slayer', description: 'Defeat 10 Demons in the Abyss.', target: 'demon', zone: 'abyss', required: 10, reward: { damagePercent: 10 }, rewardText: '+10% Damage', tier: 5 },
-  { id: 'hunt_crystal_drakes', name: 'Drake Tamer', description: 'Defeat 12 Crystal Drakes in the Crystal Caves.', target: 'crystal_drake', zone: 'crystal_caves', required: 12, reward: { maxHealth: 15, damagePercent: 5 }, rewardText: '+15 Max HP, +5% Damage', tier: 4 },
+  { id: 'hunt_slimes', name: 'The Oozing Menace', description: 'The Meadow is overrun. Grimjaw needs 30 Slimes cleared before they reach the Sanctuary walls.', target: 'slime', zone: 'meadow', required: 30, reward: { maxHealth: 10 }, rewardText: '+10 Max HP', tier: 1 },
+  { id: 'hunt_bats', name: 'Silent Wings', description: 'Travelers report Bat swarms ambushing anyone who strays from the path. Eliminate 25 to restore safe passage.', target: 'bat', zone: 'meadow', required: 25, reward: { speed: 5 }, rewardText: '+5 Speed', tier: 1 },
+  { id: 'hunt_skeletons', name: 'Restless Dead', description: 'Something is raising the dead in the Forest. Put 25 Skeletons back in the ground before their numbers swell.', target: 'skeleton', zone: 'forest', required: 25, reward: { damagePercent: 5 }, rewardText: '+5% Damage', tier: 2 },
+  { id: 'hunt_wolves', name: 'Alpha Hunt', description: 'A Wolf pack has grown bold, attacking anyone entering the treeline. Thin the pack by 20 to break their territory.', target: 'wolf', zone: 'forest', required: 20, reward: { maxHealth: 15 }, rewardText: '+15 Max HP', tier: 2 },
+  { id: 'hunt_fire_imps', name: 'Embers of Chaos', description: 'Fire Imps pour from volcanic vents, spreading wildfire. Destroy 20 before the Wastes become impassable.', target: 'fire_imp', zone: 'volcanic', required: 20, reward: { maxHealth: 15, speed: 5 }, rewardText: '+15 Max HP, +5 Speed', tier: 3 },
+  { id: 'hunt_yetis', name: 'The Frozen Siege', description: 'Yetis have sealed the northern passes. Grimjaw needs 15 brought down to reopen the trade routes.', target: 'yeti', zone: 'frozen', required: 15, reward: { maxHealth: 20 }, rewardText: '+20 Max HP', tier: 4 },
+  { id: 'hunt_demons', name: 'Into the Abyss', description: 'Demons are spilling through rifts in the deepest zone. Only the strongest survive. Banish 10 back to the void.', target: 'demon', zone: 'abyss', required: 10, reward: { damagePercent: 10 }, rewardText: '+10% Damage', tier: 5 },
+  { id: 'hunt_crystal_drakes', name: 'Shattered Scales', description: 'Crystal Drakes hoard magical energy that could power the Sanctuary. Defeat 12 and claim their resonance.', target: 'crystal_drake', zone: 'crystal_caves', required: 12, reward: { maxHealth: 15, damagePercent: 5 }, rewardText: '+15 Max HP, +5% Damage', tier: 4 },
 ];
 
 export const COLLECT_QUESTS = [
-  { id: 'collect_meadow_herbs', name: 'Meadow Remedies', description: 'Gather 8 Silverleaf Herbs from the Meadow.', item: 'silverleaf', zone: 'meadow', required: 8, reward: { healBonus: 10 }, rewardText: '+10% Healing', tier: 1, itemColor: '#4ade80', itemEmoji: '🌿' },
-  { id: 'collect_forest_mushrooms', name: 'Forest Fungi', description: 'Gather 6 Glowcap Mushrooms from the Forest.', item: 'glowcap', zone: 'forest', required: 6, reward: { speed: 8 }, rewardText: '+8 Speed', tier: 2, itemColor: '#a855f7', itemEmoji: '🍄' },
-  { id: 'collect_fire_crystals', name: 'Volcanic Crystals', description: 'Gather 5 Emberstone Crystals from the Volcanic Wastes.', item: 'emberstone', zone: 'volcanic', required: 5, reward: { damagePercent: 8 }, rewardText: '+8% Damage', tier: 3, itemColor: '#f97316', itemEmoji: '🔶' },
-  { id: 'collect_frost_flowers', name: 'Frozen Blossoms', description: 'Gather 4 Frostbloom Flowers from the Frozen Expanse.', item: 'frostbloom', zone: 'frozen', required: 4, reward: { maxHealth: 25 }, rewardText: '+25 Max HP', tier: 4, itemColor: '#67e8f9', itemEmoji: '❄️' },
-  { id: 'collect_void_shards', name: 'Abyssal Fragments', description: 'Gather 3 Void Shards from the Abyss.', item: 'void_shard', zone: 'abyss', required: 3, reward: { damagePercent: 12, maxHealth: 10 }, rewardText: '+12% Damage, +10 Max HP', tier: 5, itemColor: '#6366f1', itemEmoji: '💎' },
-  { id: 'collect_prism_dust', name: 'Crystal Essence', description: 'Gather 5 Prism Dust from the Crystal Caves.', item: 'prism_dust', zone: 'crystal_caves', required: 5, reward: { cooldownReduction: 5 }, rewardText: '5% Cooldown Reduction', tier: 4, itemColor: '#ec4899', itemEmoji: '✨' },
+  { id: 'collect_meadow_herbs', name: 'Willow\'s Remedy', description: 'Willow\'s healing stores are running low. Gather 8 Silverleaf Herbs from the Meadow — the wounded depend on it.', item: 'silverleaf', zone: 'meadow', required: 8, reward: { healBonus: 10 }, rewardText: '+10% Healing', tier: 1, itemColor: '#4ade80', itemEmoji: '🌿' },
+  { id: 'collect_forest_mushrooms', name: 'The Glowing Spores', description: 'A rare Glowcap bloom has been spotted in the Forest. Willow needs 6 — their bioluminescence can brew powerful speed tonics.', item: 'glowcap', zone: 'forest', required: 6, reward: { speed: 8 }, rewardText: '+8 Speed', tier: 2, itemColor: '#a855f7', itemEmoji: '🍄' },
+  { id: 'collect_fire_crystals', name: 'Heart of the Volcano', description: 'Emberstones form only in the hottest volcanic vents. Retrieve 5 — Willow can forge them into damage-amplifying elixirs.', item: 'emberstone', zone: 'volcanic', required: 5, reward: { damagePercent: 8 }, rewardText: '+8% Damage', tier: 3, itemColor: '#f97316', itemEmoji: '🔶' },
+  { id: 'collect_frost_flowers', name: 'Blossoms of the Tundra', description: 'Frostbloom Flowers only grow where magic and ice converge. Find 4 in the Frozen Expanse for a vitality brew.', item: 'frostbloom', zone: 'frozen', required: 4, reward: { maxHealth: 25 }, rewardText: '+25 Max HP', tier: 4, itemColor: '#67e8f9', itemEmoji: '❄️' },
+  { id: 'collect_void_shards', name: 'Fragments of the Abyss', description: 'Void Shards contain concentrated dark energy. Willow dares not enter the Abyss herself. Bring back 3 — the power they hold is extraordinary.', item: 'void_shard', zone: 'abyss', required: 3, reward: { damagePercent: 12, maxHealth: 10 }, rewardText: '+12% Damage, +10 Max HP', tier: 5, itemColor: '#6366f1', itemEmoji: '💎' },
+  { id: 'collect_prism_dust', name: 'Crystalline Resonance', description: 'The Crystal Caves hum with arcane frequency. Collect 5 handfuls of Prism Dust — Willow can distill it into a cooldown tonic.', item: 'prism_dust', zone: 'crystal_caves', required: 5, reward: { cooldownReduction: 5 }, rewardText: '5% Cooldown Reduction', tier: 4, itemColor: '#ec4899', itemEmoji: '✨' },
 ];
 
 // NPC State tracking

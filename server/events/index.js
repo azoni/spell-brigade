@@ -16,6 +16,7 @@ import { createProjectile, spawnDungeonEnemies, spawnDragonBoss, spawnCustomBoss
 import { savePlayerToDb, loadPlayerFromDb, sessionsDb, loadUserFromDb, getUnlockedSkins, getPlayerRank } from '../db/index.js';
 import { generateDungeon, generateDungeonLLM, sanitizeDungeonForClient } from '../dungeon-generator.js';
 import { generateWizard } from '../wizard-generator.js';
+import { llmGenerate, isLLMEnabled } from '../openrouter.js';
 
 export function registerSocketEvents(io) {
 io.on('connection', (socket) => {
@@ -165,9 +166,10 @@ io.on('connection', (socket) => {
     }
     
     // Calculate stats based on level
-    const healthBonus = (level - 1) * 12;
-    const speedBonus = (level - 1) * 2;
-    const damageMultiplier = 1 + (level - 1) * 0.05;
+    const healthBonus = (level - 1) * 18;
+    const speedBonus = (level - 1) * 3;
+    // Use compound formula matching level-up: *= 1.04 per level
+    const damageMultiplier = Math.pow(1.04, level - 1);
     
     // Get unlocked skins
     const unlockedSkins = Object.values(SKINS)
@@ -239,6 +241,20 @@ io.on('connection', (socket) => {
       player.dashAbility = classData.dashAbility;
       player.ultimateAbility = classData.ultimateAbility;
       console.log(`🧙 Applied custom wizard properties: ${classData.name}, spells: ${player.spells?.join(', ')}`);
+    }
+    
+    // Set visual properties for ALL classes (built-in and custom)
+    if (!player.bodyStyle) {
+      player.bodyStyle = classData.bodyStyle || 'wizard';
+    }
+    if (!player.headgear) {
+      player.headgear = classData.headgear || 'pointyHat';
+    }
+    if (!player.projectileShape) {
+      player.projectileShape = classData.projectileShape || 'orb';
+    }
+    if (!player.secondaryColor) {
+      player.secondaryColor = classData.secondaryColor || classData.color;
     }
     
     // Store guestId on player for ownership tracking
@@ -362,13 +378,13 @@ io.on('connection', (socket) => {
         completedQuests: player.completedQuests || [],
         questBonuses: player.questBonuses || {},
         isCustomWizard: player.isCustomWizard || false,
-        customColor: player.isCustomWizard ? player.color : undefined,
-        customSecondaryColor: player.isCustomWizard ? (player.secondaryColor || player.color) : undefined,
+        customColor: player.color || undefined,
+        customSecondaryColor: player.secondaryColor || classData?.secondaryColor || player.color || undefined,
         customClassName: player.isCustomWizard ? player.className : undefined,
-        customIconStyle: player.isCustomWizard ? (player.iconStyle || 'star') : undefined,
-        customBodyStyle: player.isCustomWizard ? (player.bodyStyle || 'wizard') : undefined,
-        customProjectileShape: player.isCustomWizard ? (player.projectileShape || 'orb') : undefined,
-        customHeadgear: player.isCustomWizard ? (player.headgear || 'pointyHat') : undefined,
+        customIconStyle: player.iconStyle || classData?.iconStyle || 'star',
+        customBodyStyle: player.bodyStyle || classData?.bodyStyle || 'wizard',
+        customProjectileShape: player.projectileShape || classData?.projectileShape || 'orb',
+        customHeadgear: player.headgear || classData?.headgear || 'pointyHat',
       },
       world: WORLD,
       zones: ZONES,
@@ -393,6 +409,100 @@ io.on('connection', (socket) => {
     
     // Send chat history to new player
     socket.emit('chatHistory', gameState.chatMessages);
+    
+    // ===========================================
+    // STORY INTRO - Personalized NPC greeting
+    // ===========================================
+    const isNewCharacter = player.level <= 1 && (player.kills || 0) === 0;
+    const className = player.isCustomWizard ? (player.className || 'Custom Wizard') : (classData?.name || player.class || 'Wizard');
+    const classDesc = classData?.description || '';
+    const classLore = classData?.lore || '';
+    
+    // Fire-and-forget async story generation
+    (async () => {
+      try {
+        if (isNewCharacter && isLLMEnabled()) {
+          // New character: full cinematic intro from the Ethereal Guide
+          const storyPrompt = `You are the Ethereal Guide, a wise ancient spirit who greets new wizards arriving at the Sanctuary in Spell Brigade.
+
+A new wizard has arrived:
+- Name: "${player.name}"
+- Class: "${className}"
+- Class description: "${classDesc}"
+- Class lore: "${classLore}"
+
+Write a SHORT, evocative welcome. Return ONLY this JSON:
+{
+  "lines": [
+    "Line 1 - greet them by name, notice something about their class/aura",
+    "Line 2 - briefly describe the world: Sanctuary is safe, but beyond lie dangerous zones filled with monsters",
+    "Line 3 - mention the NPCs who can help: Hunt Master Grimjaw has bounties, Herbalist Willow needs rare ingredients, Knight Commander Aldric guards a dungeon",
+    "Line 4 - motivational send-off, reference their class strength, tell them to start in the Meadow"
+  ]
+}
+
+Rules:
+- Each line must be 1-2 sentences MAX. Players won't read walls of text.
+- Be atmospheric but concise. This is a game, not a novel.
+- Reference their specific class/name naturally.
+- Sound wise and ancient, not generic.
+- No markdown, no backticks, ONLY the JSON.`;
+
+          const result = await llmGenerate(
+            'You are a game NPC dialogue writer. Return only valid JSON.',
+            storyPrompt, 400, 'standard',
+            { type: 'story_intro' }
+          );
+          
+          if (result?.lines && Array.isArray(result.lines) && result.lines.length >= 2) {
+            socket.emit('storyIntro', {
+              npcName: 'Ethereal Guide',
+              npcColor: '#67e8f9',
+              lines: result.lines.slice(0, 5).map(l => String(l).slice(0, 200)),
+              isNew: true,
+            });
+            return;
+          }
+        }
+        
+        // Fallback: template intro for new players (no LLM) or returning players
+        if (isNewCharacter) {
+          socket.emit('storyIntro', {
+            npcName: 'Ethereal Guide',
+            npcColor: '#67e8f9',
+            lines: [
+              `Ah... ${player.name}. I sensed a new presence — a ${className}, no less. The Sanctuary has been waiting for you.`,
+              `Beyond these walls lie six perilous zones. Monsters roam freely, and powerful bosses guard each territory. But here, you are safe.`,
+              `Seek out Hunt Master Grimjaw for bounties, Herbalist Willow for gathering quests, and Knight Commander Aldric if you dare face the Dragon's Gauntlet.`,
+              `Start in the Meadow to hone your skills. Grow stronger, ${player.name} — the realm has need of you.`,
+            ],
+            isNew: true,
+          });
+        } else {
+          // Returning player — short welcome back
+          const kills = player.kills || 0;
+          const bossCount = Object.keys(player.bossKills || {}).length;
+          let welcomeLine;
+          if (bossCount >= 5) {
+            welcomeLine = `${player.name}. The Champion returns. The realm breathes easier knowing you walk among us once more.`;
+          } else if (kills > 200) {
+            welcomeLine = `Ah, ${player.name} the ${className}. Your reputation precedes you — ${kills} slain and counting. Welcome back.`;
+          } else if (level >= 20) {
+            welcomeLine = `${player.name}. You've grown since I last saw you. Level ${level} — impressive. The deeper zones await your return.`;
+          } else {
+            welcomeLine = `Welcome back, ${player.name}. The Sanctuary still stands, and the wilds still need taming. Your journey continues.`;
+          }
+          socket.emit('storyIntro', {
+            npcName: 'Ethereal Guide',
+            npcColor: '#67e8f9',
+            lines: [welcomeLine],
+            isNew: false,
+          });
+        }
+      } catch (err) {
+        console.error('Story intro generation error:', err.message);
+      }
+    })();
   });
 
   socket.on('input', (input) => {
@@ -1420,21 +1530,49 @@ io.on('connection', (socket) => {
         }, spell.delay);
         
       } else if (abilityId === 'inferno') {
-        // Inferno - massive AOE around self
-        const infernoDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
-        for (const enemy of gameState.enemies.values()) {
-          if (enemy.health <= 0) continue;
-          // DUNGEON ISOLATION
-          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
-          if (distance(enemy, player) < spell.radius) {
-            enemy.health -= infernoDmg;
-            spawnDamageNumber(enemy.x, enemy.y - 20, infernoDmg);
-            checkEnemyDeath(enemy, player.id);
+        // PHOENIX FORM — Transform into a living flame with fire aura + speed
+        const transformDuration = spell.duration || 6000;
+        const auraDmg = Math.floor((spell.damage * (player.damageMultiplier || 1)) / 10);
+        
+        player.speedBoostUntil = now + transformDuration;
+        player.speedBoostMultiplier = 1.4;
+        player.damageBoostUntil = now + transformDuration;
+        player.savedDamageMultiplier = player.damageMultiplier || 1;
+        player.damageMultiplier = (player.damageMultiplier || 1) * 1.6;
+        player.transformUntil = now + transformDuration;
+        player.transformColor = '#ff4500';
+        
+        let ticks = 0;
+        const maxTicks = Math.floor(transformDuration / 400);
+        const auraInterval = setInterval(() => {
+          if (ticks >= maxTicks || player.health <= 0) {
+            clearInterval(auraInterval);
+            if (Date.now() >= (player.damageBoostUntil || 0)) {
+              player.damageMultiplier = player.savedDamageMultiplier || 1;
+            }
+            player.transformUntil = 0;
+            return;
           }
-        }
-        io.emit('inferno', { x: player.x, y: player.y, radius: spell.radius });
-        spawnParticles(player.x, player.y, '#ff0000', 40);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
+          ticks++;
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0) continue;
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < spell.radius) {
+              enemy.health -= auraDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 10, auraDmg);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          spawnParticles(player.x, player.y, '#ff6b35', 6);
+        }, 400);
+        
+        io.emit('customAbilityEffect', {
+          playerId: player.id, style: 'transform',
+          x: player.x, y: player.y, radius: spell.radius,
+          color: '#ff4500', name: 'Phoenix Form', duration: transformDuration,
+        });
+        spawnParticles(player.x, player.y, '#ff4500', 30);
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: 'Phoenix Form', abilityColor: '#ff4500' });
         
       } else if (abilityId === 'frostNova') {
         // Frost Nova - freeze nearby enemies
@@ -1703,17 +1841,58 @@ io.on('connection', (socket) => {
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
         
       } else if (abilityId === 'apocalypse') {
-        // Apocalypse - massive void explosion
-        for (const enemy of gameState.enemies.values()) {
-          if (enemy.health <= 0) continue;
-          if (distance(enemy, player) < spell.radius) {
-            enemy.health -= spell.damage;
-            spawnDamageNumber(enemy.x, enemy.y - 20, spell.damage);
-            checkEnemyDeath(enemy, player.id);
-          }
+        // VOID APOCALYPSE — Summon void creatures + delayed massive burst
+        const burstDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        const minionCount = 4;
+        const minionDuration = 8000;
+        const minions = [];
+        
+        // Summon void shades
+        for (let i = 0; i < minionCount; i++) {
+          const angle = (Math.PI * 2 / minionCount) * i;
+          const mx = player.x + Math.cos(angle) * 80;
+          const my = player.y + Math.sin(angle) * 80;
+          const minionId = uuidv4();
+          const minion = {
+            id: minionId, type: 'summon', name: 'Void Shade',
+            health: 120, maxHealth: 120, baseSpeed: 110, damage: Math.floor(burstDmg / 6),
+            radius: 14, xp: 0, color: '#8b00ff', behavior: 'chase',
+            x: mx, y: my, zone: player.zone || 'meadow',
+            isSummon: true, ownerId: player.id, summonExpires: now + minionDuration,
+            slowedUntil: 0, frozenUntil: 0, aggroRange: 400,
+            isDungeon: player.inDungeon || false,
+            dungeonId: player.customDungeonId || 'default',
+          };
+          gameState.enemies.set(minionId, minion);
+          minions.push(minionId);
         }
-        io.emit('apocalypse', { x: player.x, y: player.y, radius: spell.radius });
-        spawnParticles(player.x, player.y, '#8b00ff', 60);
+        setTimeout(() => {
+          for (const mid of minions) {
+            const m = gameState.enemies.get(mid);
+            if (m && m.isSummon) { gameState.enemies.delete(mid); spawnParticles(m.x, m.y, '#8b00ff', 5); }
+          }
+        }, minionDuration);
+        
+        // Delayed void explosion after 1.5s
+        io.emit('meteorWarning', { x: player.x, y: player.y, radius: spell.radius, delay: 1500, color: '#8b00ff' });
+        setTimeout(() => {
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0 || enemy.isSummon) continue;
+            if (distance(enemy, player) < spell.radius) {
+              enemy.health -= burstDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 20, burstDmg);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          io.emit('explosion', { x: player.x, y: player.y, radius: spell.radius, color: '#8b00ff' });
+        }, 1500);
+        
+        io.emit('customAbilityEffect', {
+          playerId: player.id, style: 'summon',
+          x: player.x, y: player.y, radius: 80,
+          color: '#8b00ff', name: 'Void Apocalypse', duration: 1500,
+        });
+        spawnParticles(player.x, player.y, '#8b00ff', 40);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'huntersMark') {
         // Hunter's Mark - fast piercing arrow
@@ -1800,35 +1979,115 @@ io.on('connection', (socket) => {
         spawnParticles(player.x, player.y, '#fbbf24', 12);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'barbellSpin') {
-        // Barbell Spin - AOE around player
+        // BARBELL SPIN — Sustained: spin for 3s dealing damage every pulse + pulling enemies in
+        const spinDuration = 3000;
         const spinDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
-        for (const enemy of gameState.enemies.values()) {
-          if (enemy.health <= 0) continue;
-          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
-          if (distance(enemy, player) < spell.radius) {
-            enemy.health -= spinDmg;
-            spawnDamageNumber(enemy.x, enemy.y - 10, spinDmg);
-            checkEnemyDeath(enemy, player.id);
+        const dmgPerPulse = Math.floor(spinDmg / 6);
+        
+        // Invulnerable while spinning
+        player.invulnerableUntil = now + spinDuration;
+        player.speedBoostUntil = now + spinDuration;
+        player.speedBoostMultiplier = 0.6; // Slower while spinning
+        
+        io.emit('customAbilityEffect', {
+          playerId: player.id, style: 'sustained',
+          x: player.x, y: player.y, radius: spell.radius,
+          color: '#b45309', name: 'Barbell Spin', duration: spinDuration,
+        });
+        
+        let pulses = 0;
+        const spinInterval = setInterval(() => {
+          if (pulses >= 6 || player.health <= 0) {
+            clearInterval(spinInterval);
+            return;
           }
-        }
+          pulses++;
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0 || enemy.isSummon) continue;
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < spell.radius) {
+              enemy.health -= dmgPerPulse;
+              spawnDamageNumber(enemy.x, enemy.y - 10, dmgPerPulse);
+              // Pull enemies toward the spin
+              const pullDir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
+              enemy.x += pullDir.x * 15;
+              enemy.y += pullDir.y * 15;
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          spawnParticles(player.x, player.y, '#b45309', 6);
+        }, 500);
+        
         io.emit('barbellSpin', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#b45309', 25);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'ultimateFlex') {
-        // Ultimate Flex - massive AOE shockwave
+        // GAINS MODE — Transform: massive size, damage aura, speed boost, initial shockwave
+        const transformDuration = 7000;
         const flexDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        const auraDmg = Math.floor(flexDmg / 8);
+        
+        // Initial shockwave burst
         for (const enemy of gameState.enemies.values()) {
           if (enemy.health <= 0) continue;
           if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
           if (distance(enemy, player) < spell.radius) {
-            enemy.health -= flexDmg;
-            spawnDamageNumber(enemy.x, enemy.y - 20, flexDmg);
+            enemy.health -= Math.floor(flexDmg * 0.4);
+            spawnDamageNumber(enemy.x, enemy.y - 20, Math.floor(flexDmg * 0.4));
+            // Knockback
+            const pushDir = normalize({ x: enemy.x - player.x, y: enemy.y - player.y });
+            enemy.x += pushDir.x * 80;
+            enemy.y += pushDir.y * 80;
             checkEnemyDeath(enemy, player.id);
           }
         }
+        
+        // Transform: speed + damage + damage aura
+        player.speedBoostUntil = now + transformDuration;
+        player.speedBoostMultiplier = 1.5;
+        player.damageBoostUntil = now + transformDuration;
+        player.savedDamageMultiplier = player.damageMultiplier || 1;
+        player.damageMultiplier = (player.damageMultiplier || 1) * 1.8;
+        player.transformUntil = now + transformDuration;
+        player.transformColor = '#fbbf24';
+        
+        // Shield too — Brute is tanky
+        player.shieldAmount = Math.floor(player.maxHealth * 0.3);
+        player.shieldUntil = now + transformDuration;
+        player.shieldColor = '#fbbf24';
+        
+        let ticks = 0;
+        const maxTicks = Math.floor(transformDuration / 500);
+        const auraInterval = setInterval(() => {
+          if (ticks >= maxTicks || player.health <= 0) {
+            clearInterval(auraInterval);
+            if (Date.now() >= (player.damageBoostUntil || 0)) {
+              player.damageMultiplier = player.savedDamageMultiplier || 1;
+            }
+            player.transformUntil = 0;
+            return;
+          }
+          ticks++;
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0 || enemy.isSummon) continue;
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < 180) {
+              enemy.health -= auraDmg;
+              spawnDamageNumber(enemy.x, enemy.y - 10, auraDmg);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          spawnParticles(player.x, player.y, '#fbbf24', 4);
+        }, 500);
+        
+        io.emit('customAbilityEffect', {
+          playerId: player.id, style: 'transform',
+          x: player.x, y: player.y, radius: 180,
+          color: '#fbbf24', name: 'GAINS MODE', duration: transformDuration,
+        });
         io.emit('ultimateFlex', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#fbbf24', 50);
-        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
+        socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: 'GAINS MODE', abilityColor: '#fbbf24' });
       
       // === SWORDSMAN ABILITIES ===
       } else if (abilityId === 'riposte') {
@@ -1865,29 +2124,145 @@ io.on('connection', (socket) => {
         spawnParticles(player.x, player.y, '#708090', 20);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
       } else if (abilityId === 'bladestorm') {
-        // Bladestorm - massive whirlwind of steel
+        // BLADESTORM — Sustained: 4s spinning blade tornado, invulnerable, throwing blade projectiles
+        const stormDuration = 4000;
         const stormDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
-        for (const enemy of gameState.enemies.values()) {
-          if (enemy.health <= 0) continue;
-          if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
-          if (distance(enemy, player) < spell.radius) {
-            enemy.health -= stormDmg;
-            spawnDamageNumber(enemy.x, enemy.y - 20, stormDmg);
-            checkEnemyDeath(enemy, player.id);
+        const dmgPerPulse = Math.floor(stormDmg / 8);
+        
+        player.invulnerableUntil = now + stormDuration;
+        player.speedBoostUntil = now + stormDuration;
+        player.speedBoostMultiplier = 1.3;
+        player.transformUntil = now + stormDuration;
+        player.transformColor = '#c0c0c0';
+        
+        io.emit('customAbilityEffect', {
+          playerId: player.id, style: 'sustained',
+          x: player.x, y: player.y, radius: spell.radius,
+          color: '#c0c0c0', name: 'Bladestorm', duration: stormDuration,
+        });
+        
+        let pulses = 0;
+        const stormInterval = setInterval(() => {
+          if (pulses >= 8 || player.health <= 0) {
+            clearInterval(stormInterval);
+            player.transformUntil = 0;
+            return;
           }
-        }
+          pulses++;
+          // Damage nearby enemies
+          for (const enemy of gameState.enemies.values()) {
+            if (enemy.health <= 0 || enemy.isSummon) continue;
+            if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+            if (distance(enemy, player) < spell.radius) {
+              enemy.health -= dmgPerPulse;
+              spawnDamageNumber(enemy.x, enemy.y - 10, dmgPerPulse);
+              checkEnemyDeath(enemy, player.id);
+            }
+          }
+          // Throw blade projectiles outward every other pulse
+          if (pulses % 2 === 0) {
+            for (let i = 0; i < 6; i++) {
+              const angle = (Math.PI * 2 / 6) * i + (pulses * 0.5);
+              gameState.projectiles.set(uuidv4(), {
+                x: player.x, y: player.y,
+                vx: Math.cos(angle) * 400, vy: Math.sin(angle) * 400,
+                damage: Math.floor(dmgPerPulse * 0.6), radius: 8,
+                ownerId: player.id, spellId: 'bladestorm', ownerClass: player.class,
+                color: '#c0c0c0', trailColor: '#708090',
+                maxRange: 200, traveled: 0, createdAt: Date.now(),
+              });
+            }
+          }
+          spawnParticles(player.x, player.y, '#c0c0c0', 5);
+        }, 500);
+        
         io.emit('bladestorm', { playerId: player.id, x: player.x, y: player.y, radius: spell.radius });
         spawnParticles(player.x, player.y, '#c0c0c0', 45);
         socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: spell.color });
 
       } else if (spell.type === 'classAbility') {
         // Custom wizard abilities - different execution per style
-        const abilityDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
+        let abilityDmg = Math.floor(spell.damage * (player.damageMultiplier || 1));
         const abilityRadius = spell.radius || 150;
         const abilityColor = spell.color || player.color || '#a78bfa';
         const abilityStyle = spell.style || 'burst';
         
-        if (abilityStyle === 'targeted') {
+        // Echo Cave buff: double next ability damage
+        if (player.echoCaveBuff && now < (player.echoCaveExpires || 0)) {
+          abilityDmg = Math.floor(abilityDmg * 2);
+          player.echoCaveBuff = false;
+          player.echoCaveExpires = 0;
+          io.to(player.socketId).emit('secretDiscovered', { id: 'echo_used', message: '🔊 ECHO AMPLIFIED! 2x damage!', emoji: '🔊', type: 'echo_used' });
+          spawnParticles(player.x, player.y, '#a78bfa', 20);
+        }
+        
+        // Initialize buff array if needed
+        if (!player.activeBuffs) player.activeBuffs = [];
+        
+        if (abilityStyle === 'buff_speed') {
+          // Speed boost buff — grants movement speed for duration
+          const duration = spell.duration || 5000;
+          player.speedBoostUntil = now + duration;
+          player.speedBoostMultiplier = 1.5;
+          player.activeBuffs.push({ type: 'speed', color: abilityColor, expiresAt: now + duration });
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'buff', buffType: 'speed',
+            x: player.x, y: player.y, radius: 40,
+            color: abilityColor, name: spell.name, duration,
+          });
+          spawnParticles(player.x, player.y, abilityColor, 12);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor });
+          
+        } else if (abilityStyle === 'buff_damage') {
+          // Damage boost — increases damage multiplier temporarily
+          const duration = spell.duration || 6000;
+          const savedMult = player.damageMultiplier || 1;
+          player.damageMultiplier = savedMult * 1.5;
+          player.activeBuffs.push({ type: 'damage', color: abilityColor, expiresAt: now + duration });
+          setTimeout(() => { player.damageMultiplier = savedMult; }, duration);
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'buff', buffType: 'damage',
+            x: player.x, y: player.y, radius: 40,
+            color: abilityColor, name: spell.name, duration,
+          });
+          spawnParticles(player.x, player.y, abilityColor, 12);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor });
+          
+        } else if (abilityStyle === 'shield') {
+          // Damage shield — absorbs incoming damage
+          const shieldHP = spell.damage || 50; // Use damage field as shield HP
+          const duration = spell.duration || 8000;
+          player.shieldAmount = (player.shieldAmount || 0) + shieldHP;
+          player.shieldUntil = now + duration;
+          player.shieldColor = abilityColor;
+          player.activeBuffs.push({ type: 'shield', color: abilityColor, expiresAt: now + duration });
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'shield',
+            x: player.x, y: player.y, radius: abilityRadius,
+            color: abilityColor, name: spell.name, duration,
+          });
+          spawnParticles(player.x, player.y, abilityColor, 15);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor });
+          
+        } else if (abilityStyle === 'heal') {
+          // Heal — restore HP and grant brief regen
+          const healAmount = Math.floor((spell.damage || 30) * (player.damageMultiplier || 1));
+          player.health = Math.min(player.health + healAmount, player.maxHealth);
+          spawnDamageNumber(player.x, player.y - 20, healAmount, false, '#4ade80');
+          // Brief regen
+          const regenDuration = spell.duration || 5000;
+          player.regenUntil = now + regenDuration;
+          player.regenAmount = 8; // HP per second
+          player.activeBuffs.push({ type: 'heal', color: '#4ade80', expiresAt: now + regenDuration });
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'buff', buffType: 'heal',
+            x: player.x, y: player.y, radius: 60,
+            color: '#4ade80', name: spell.name, duration: regenDuration,
+          });
+          spawnParticles(player.x, player.y, '#4ade80', 12);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: spell.name, abilityColor: '#4ade80' });
+          
+        } else if (abilityStyle === 'targeted') {
           // SLOT 2: Targeted delayed AOE at cursor position (like meteor strike)
           const strikeX = tx ?? player.x;
           const strikeY = ty ?? player.y;
@@ -1906,6 +2281,7 @@ io.on('connection', (socket) => {
           setTimeout(() => {
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
+              if (enemy.isSummon && enemy.ownerId === player.id) continue;
               if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
               if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
                 if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
@@ -1950,6 +2326,7 @@ io.on('connection', (socket) => {
             pulsesDone++;
             for (const enemy of gameState.enemies.values()) {
               if (enemy.health <= 0) continue;
+              if (enemy.isSummon && enemy.ownerId === player.id) continue;
               if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
               if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
                 if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
@@ -1963,10 +2340,135 @@ io.on('connection', (socket) => {
             spawnParticles(player.x, player.y, abilityColor, 8);
           }, 500);
           
+        } else if (abilityStyle === 'buff') {
+          // BUFF: Temporary stat boost (speed + damage or defense)
+          const buffDuration = spell.duration || 5000;
+          const buffName = spell.name || 'Power Buff';
+          
+          // Speed boost
+          player.speedBoostUntil = now + buffDuration;
+          player.speedBoostMultiplier = 1.35;
+          // Damage boost
+          player.damageBoostUntil = now + buffDuration;
+          player.savedDamageMultiplier = player.damageMultiplier || 1;
+          player.damageMultiplier = (player.damageMultiplier || 1) * 1.4;
+          
+          setTimeout(() => {
+            if (player.damageBoostUntil && Date.now() >= player.damageBoostUntil) {
+              player.damageMultiplier = player.savedDamageMultiplier || 1;
+            }
+          }, buffDuration);
+          
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'buff',
+            x: player.x, y: player.y, radius: 60,
+            color: abilityColor, name: buffName, duration: buffDuration,
+          });
+          spawnParticles(player.x, player.y, abilityColor, 12);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: buffName, abilityColor: abilityColor });
+          
+        } else if (abilityStyle === 'summon') {
+          // SUMMON: Spawn temporary allied minions
+          const minionCount = Math.min(5, Math.max(2, Math.floor((spell.radius || 100) / 40)));
+          const minionDmg = Math.floor(abilityDmg / minionCount);
+          const minionDuration = spell.duration || 8000;
+          const summonName = spell.name || 'Summon Allies';
+          
+          const minions = [];
+          for (let i = 0; i < minionCount; i++) {
+            const angle = (Math.PI * 2 / minionCount) * i;
+            const mx = player.x + Math.cos(angle) * 60;
+            const my = player.y + Math.sin(angle) * 60;
+            const minionId = uuidv4();
+            const minion = {
+              id: minionId, type: 'summon', name: summonName + ' minion',
+              health: 80, maxHealth: 80, baseSpeed: 120, damage: minionDmg,
+              radius: 12, xp: 0, color: abilityColor, behavior: 'chase',
+              x: mx, y: my, zone: player.zone || 'meadow',
+              isSummon: true, ownerId: player.id, summonExpires: now + minionDuration,
+              slowedUntil: 0, frozenUntil: 0, aggroRange: 350,
+              lastAttack: 0, animFrame: 0, animTime: 0,
+              isDungeon: player.inDungeon || false,
+              dungeonId: player.customDungeonId || 'default',
+            };
+            gameState.enemies.set(minionId, minion);
+            minions.push(minionId);
+          }
+          
+          // Despawn after duration
+          setTimeout(() => {
+            for (const mid of minions) {
+              const m = gameState.enemies.get(mid);
+              if (m && m.isSummon) {
+                gameState.enemies.delete(mid);
+                spawnParticles(m.x, m.y, abilityColor, 5);
+              }
+            }
+          }, minionDuration);
+          
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'summon',
+            x: player.x, y: player.y, radius: 60,
+            color: abilityColor, name: summonName, duration: 1500,
+          });
+          spawnParticles(player.x, player.y, abilityColor, 15);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: summonName, abilityColor: abilityColor });
+          
+        } else if (abilityStyle === 'transform') {
+          // TRANSFORM: Temporary form change with stat boost + damage aura
+          const transformDuration = spell.duration || 6000;
+          const auraDmg = Math.floor(abilityDmg / 8);
+          const transformName = spell.name || 'Transformation';
+          
+          // Stat boosts
+          player.speedBoostUntil = now + transformDuration;
+          player.speedBoostMultiplier = 1.3;
+          player.damageBoostUntil = now + transformDuration;
+          player.savedDamageMultiplier = player.damageMultiplier || 1;
+          player.damageMultiplier = (player.damageMultiplier || 1) * 1.6;
+          player.transformUntil = now + transformDuration;
+          player.transformColor = abilityColor;
+          
+          // Damage aura ticks
+          let ticks = 0;
+          const maxTicks = Math.floor(transformDuration / 500);
+          const auraInterval = setInterval(() => {
+            if (ticks >= maxTicks || player.health <= 0) {
+              clearInterval(auraInterval);
+              if (Date.now() >= (player.damageBoostUntil || 0)) {
+                player.damageMultiplier = player.savedDamageMultiplier || 1;
+              }
+              player.transformUntil = 0;
+              return;
+            }
+            ticks++;
+            for (const enemy of gameState.enemies.values()) {
+              if (enemy.health <= 0 || enemy.isSummon) continue;
+              if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
+              if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
+                if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;
+              }
+              if (distance(enemy, player) < (spell.radius || 150)) {
+                enemy.health -= auraDmg;
+                spawnDamageNumber(enemy.x, enemy.y - 10, auraDmg);
+                checkEnemyDeath(enemy, player.id);
+              }
+            }
+          }, 500);
+          
+          io.emit('customAbilityEffect', {
+            playerId: player.id, style: 'transform',
+            x: player.x, y: player.y, radius: spell.radius || 150,
+            color: abilityColor, name: transformName, duration: transformDuration,
+          });
+          spawnParticles(player.x, player.y, abilityColor, 25);
+          socket.emit('abilityActivated', { slot: abilitySlot, cooldown: spell.cooldown, abilityName: transformName, abilityColor: abilityColor });
+          
         } else {
           // SLOT 1: Instant burst around player (default)
           for (const enemy of gameState.enemies.values()) {
             if (enemy.health <= 0) continue;
+            if (enemy.isSummon && enemy.ownerId === player.id) continue;
             if (abilityPlayerInDungeon !== (enemy.isDungeon || false)) continue;
             if (abilityPlayerInDungeon && (enemy.isDungeon || false)) {
               if ((enemy.dungeonId || 'default') !== (player.customDungeonId || 'default')) continue;

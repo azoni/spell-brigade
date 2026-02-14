@@ -200,6 +200,244 @@ export function isTooCloseToSanctuary(x, y) {
   return Math.sqrt(dx * dx + dy * dy) < (SANCTUARY_RADIUS + SANCTUARY_BUFFER);
 }
 
+// ===========================================
+// EASTER EGGS & SECRETS
+// ===========================================
+export const SECRETS = {
+  // Hidden shrines - temporary buffs when discovered
+  shrine_speed: {
+    id: 'shrine_speed', name: 'Windrunner Shrine',
+    x: 2200, y: 6200, radius: 60, zone: 'forest',
+    type: 'shrine', buff: 'speed', buffAmount: 1.5, buffDuration: 30000,
+    message: '💨 The winds favor you! +50% speed for 30s',
+    emoji: '🌀', cooldown: 120000, // 2 min cooldown per player
+  },
+  shrine_damage: {
+    id: 'shrine_damage', name: 'Berserker Altar',
+    x: 16500, y: 3000, radius: 60, zone: 'volcanic',
+    type: 'shrine', buff: 'damage', buffAmount: 1.6, buffDuration: 25000,
+    message: '🔥 Blood rage surges through you! +60% damage for 25s',
+    emoji: '⚔️', cooldown: 120000,
+  },
+  shrine_regen: {
+    id: 'shrine_regen', name: 'Life Spring',
+    x: 12000, y: 15000, radius: 60, zone: 'frozen',
+    type: 'shrine', buff: 'regen', buffAmount: 8, buffDuration: 40000,
+    message: '💚 Warm energy heals your wounds! Regen for 40s',
+    emoji: '🌿', cooldown: 120000,
+  },
+  shrine_giant: {
+    id: 'shrine_giant', name: 'Titan Stone',
+    x: 2000, y: 1200, radius: 60, zone: 'abyss',
+    type: 'shrine', buff: 'giant', buffAmount: 1.5, buffDuration: 20000,
+    message: '🗿 You grow to massive size! +50% HP and damage for 20s',
+    emoji: '🗿', cooldown: 180000,
+  },
+  // Hidden treasure chests - one-time XP rewards
+  chest_forest: {
+    id: 'chest_forest', name: 'Moss-Covered Chest',
+    x: 1200, y: 5800, radius: 50, zone: 'forest',
+    type: 'chest', xpReward: 500,
+    message: '📦 You found a hidden treasure! +500 XP',
+    emoji: '📦',
+  },
+  chest_volcanic: {
+    id: 'chest_volcanic', name: 'Charred Strongbox',
+    x: 19500, y: 2000, radius: 50, zone: 'volcanic',
+    type: 'chest', xpReward: 1000,
+    message: '📦 Ancient treasures inside! +1000 XP',
+    emoji: '🔶',
+  },
+  chest_crystal: {
+    id: 'chest_crystal', name: 'Crystal Geode',
+    x: 20000, y: 10500, radius: 50, zone: 'crystal_caves',
+    type: 'chest', xpReward: 800,
+    message: '💎 The geode cracks open! +800 XP',
+    emoji: '💎',
+  },
+  chest_abyss: {
+    id: 'chest_abyss', name: 'Void Cache',
+    x: 2800, y: 800, radius: 50, zone: 'abyss',
+    type: 'chest', xpReward: 2000,
+    message: '🌀 Dark power surges into you! +2000 XP',
+    emoji: '🌀',
+  },
+  // Mysterious ancient runes - visit all 3 for a permanent bonus
+  rune_alpha: {
+    id: 'rune_alpha', name: 'Rune of Power',
+    x: 4500, y: 3500, radius: 50, zone: 'forest',
+    type: 'rune', runeSet: 'ancient', runeIndex: 0,
+    message: '✨ Rune of Power activated! (1/3 Ancient Runes)',
+    emoji: '🔮',
+  },
+  rune_beta: {
+    id: 'rune_beta', name: 'Rune of Wisdom',
+    x: 18000, y: 5000, radius: 50, zone: 'volcanic',
+    type: 'rune', runeSet: 'ancient', runeIndex: 1,
+    message: '✨ Rune of Wisdom activated! (2/3 Ancient Runes)',
+    emoji: '🔮',
+  },
+  rune_gamma: {
+    id: 'rune_gamma', name: 'Rune of Eternity',
+    x: 8000, y: 16000, radius: 50, zone: 'frozen',
+    type: 'rune', runeSet: 'ancient', runeIndex: 2,
+    message: '✨ Rune of Eternity activated! (3/3 Ancient Runes)',
+    emoji: '🔮',
+  },
+  // Fun secrets
+  fishing_spot: {
+    id: 'fishing_spot', name: 'Peaceful Pond',
+    x: 11500, y: 7200, radius: 80, zone: 'meadow',
+    type: 'fishing',
+    message: '🎣 You cast a line... something bites!',
+    emoji: '🎣', cooldown: 30000,
+  },
+  fishing_frozen: {
+    id: 'fishing_frozen', name: 'Ice Hole',
+    x: 10000, y: 14500, radius: 70, zone: 'frozen',
+    type: 'fishing',
+    message: '🎣 You fish through the ice...',
+    emoji: '🐟', cooldown: 25000,
+  },
+  campfire_stories: {
+    id: 'campfire_stories', name: 'Wanderer\'s Campfire',
+    x: 6500, y: 4500, radius: 60, zone: 'forest',
+    type: 'campfire',
+    message: '🔥 The warmth restores you fully!',
+    emoji: '🏕️', cooldown: 60000,
+  },
+  campfire_volcanic: {
+    id: 'campfire_volcanic', name: 'Ember Pit',
+    x: 17500, y: 4200, radius: 60, zone: 'volcanic',
+    type: 'campfire',
+    message: '🔥 The volcanic warmth empowers you!',
+    emoji: '🔥', cooldown: 60000,
+  },
+  sanctuary_campfire: {
+    id: 'sanctuary_campfire', name: 'Sanctuary Hearth',
+    x: 10200, y: 3800, radius: 80, zone: 'sanctuary',
+    type: 'campfire',
+    message: '🔥 The hearth warms your spirit! Full heal + damage boost',
+    emoji: '🔥', cooldown: 60000,
+  },
+  
+  // === WISHING WELLS - throw in XP for a random buff ===
+  wishing_well_meadow: {
+    id: 'wishing_well_meadow', name: 'Wishing Well',
+    x: 9200, y: 8200, radius: 50, zone: 'meadow',
+    type: 'wishing_well', xpCost: 50,
+    message: '🪙 The well shimmers...',
+    emoji: '⛲', cooldown: 45000,
+  },
+  wishing_well_crystal: {
+    id: 'wishing_well_crystal', name: 'Crystal Fountain',
+    x: 19000, y: 9000, radius: 50, zone: 'crystal_caves',
+    type: 'wishing_well', xpCost: 200,
+    message: '💎 The crystal waters swirl...',
+    emoji: '💎', cooldown: 45000,
+  },
+  
+  // === MUSHROOM CIRCLES - teleport to a random zone ===
+  mushroom_circle: {
+    id: 'mushroom_circle', name: 'Fairy Ring',
+    x: 3500, y: 7000, radius: 40, zone: 'forest',
+    type: 'mushroom_circle',
+    message: '🍄 The fairy ring glows... you feel yourself shifting!',
+    emoji: '🍄', cooldown: 60000,
+  },
+  
+  // === GRAVESTONES - lore messages with rare XP rewards ===
+  grave_meadow: {
+    id: 'grave_meadow', name: 'Weathered Gravestone',
+    x: 8800, y: 6800, radius: 40, zone: 'meadow',
+    type: 'gravestone',
+    messages: [
+      '"Here lies Bob the Brave. He cast fireball indoors."',
+      '"R.I.P. Sir Leeroy. He charged in alone. We warned him."',
+      '"In memory of the First Wizard. She accidentally invented slimes."',
+      '"Do not read this gravestone. Too late."',
+    ],
+    emoji: '🪦', cooldown: 90000,
+  },
+  grave_abyss: {
+    id: 'grave_abyss', name: 'Abyssal Tombstone',
+    x: 1500, y: 2200, radius: 40, zone: 'abyss',
+    type: 'gravestone',
+    messages: [
+      '"The Void stares back. It blinked first."',
+      '"Here sleeps the Architect. The dungeons were his final masterpiece."',
+      '"All paths lead here. Some lead back."',
+      '"The last boss was once a player. Don\'t think about it."',
+    ],
+    emoji: '💀', cooldown: 90000,
+  },
+  
+  // === AURORA VIEWING SPOT - passive XP gain while standing still ===
+  aurora_spot: {
+    id: 'aurora_spot', name: 'Northern Lights',
+    x: 7000, y: 17000, radius: 80, zone: 'frozen',
+    type: 'aurora',
+    message: '🌌 The aurora fills you with wonder... +XP while you watch!',
+    emoji: '🌌', cooldown: 5000, // short cooldown — gives small XP ticks
+    xpPerTick: 15,
+  },
+  
+  // === DANCE FLOOR - in sanctuary, cosmetic fun ===
+  dance_floor: {
+    id: 'dance_floor', name: 'The Groove Zone',
+    x: 10500, y: 10200, radius: 50, zone: 'sanctuary',
+    type: 'dance_floor',
+    message: '💃 You feel the rhythm! Dance mode activated!',
+    emoji: '🕺', cooldown: 10000,
+  },
+  
+  // === MYSTERIOUS OBELISK - gives random class insight/tip ===
+  obelisk: {
+    id: 'obelisk', name: 'Ancient Obelisk',
+    x: 15000, y: 8000, radius: 50, zone: 'crystal_caves',
+    type: 'obelisk',
+    messages: [
+      '💡 "The Cryomancer\'s frost step can freeze an entire pack. Time it wisely."',
+      '💡 "Bosses enter new phases at 60% and 30% HP. Watch for the shield!"',
+      '💡 "Hidden shrines grant powerful buffs. Explore every corner."',
+      '💡 "The Void Lord heals from all damage dealt. Aggression is survival."',
+      '💡 "Golden enemies drop 3x XP. The golden glow is unmistakable."',
+      '💡 "Three ancient runes are scattered across the realm. Find all three..."',
+      '💡 "The fishing pond hides more than fish. Patience is rewarded."',
+      '💡 "Custom wizards with buff abilities can support entire teams."',
+    ],
+    emoji: '🗿', cooldown: 30000,
+  },
+  
+  // === HOT SPRING - slow heal + cleanse debuffs ===
+  hot_spring: {
+    id: 'hot_spring', name: 'Volcanic Hot Spring',
+    x: 18500, y: 5500, radius: 70, zone: 'volcanic',
+    type: 'hot_spring',
+    message: '♨️ The hot spring soothes your wounds!',
+    emoji: '♨️', cooldown: 45000,
+    healPercent: 0.6, buffDuration: 20000,
+  },
+  
+  // === ECHO CAVE - doubles next ability damage ===
+  echo_cave: {
+    id: 'echo_cave', name: 'Echo Cave',
+    x: 21000, y: 11000, radius: 45, zone: 'crystal_caves',
+    type: 'echo_cave',
+    message: '🔊 Your magic echoes through the crystals! Next ability deals 2x damage!',
+    emoji: '🔊', cooldown: 120000,
+  },
+  
+  // === SHADOW MIRROR - spawns a friendly shadow clone ===
+  shadow_mirror: {
+    id: 'shadow_mirror', name: 'Shadow Mirror',
+    x: 3000, y: 3000, radius: 45, zone: 'abyss',
+    type: 'shadow_mirror',
+    message: '🪞 Your reflection steps out of the mirror!',
+    emoji: '🪞', cooldown: 180000,
+  },
+};
+
 export function getZoneAtPosition(x, y) {
   const priorityOrder = ['sanctuary', 'abyss', 'crystal_caves', 'forest', 'volcanic', 'frozen', 'meadow'];
   for (const zoneId of priorityOrder) {
