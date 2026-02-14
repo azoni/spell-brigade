@@ -2527,9 +2527,9 @@ Rules:
     if (player.activeQuests.some(q => q.id === questId)) return;
     if (player.completedQuests.includes(questId)) return;
     
-    // Max 3 active quests at a time
-    if (player.activeQuests.length >= 3) {
-      socket.emit('questError', { message: 'You can only have 3 active quests. Complete or abandon one first.' });
+    // Max 10 active quests at a time
+    if (player.activeQuests.length >= 10) {
+      socket.emit('questError', { message: 'You can only have 10 active quests. Complete or abandon one first.' });
       return;
     }
     
@@ -2675,39 +2675,21 @@ Rules:
             recommendedLevel: 30,
           });
         } else if (npc.type === 'quest_master') {
-          // Quest Master Seraphina - quest giver
+          // Lorekeeper Seraphina - realm lore and boss info
           const bossKills = player.bossKills || {};
           const defeatedCount = Object.keys(bossKills).length;
           
           if (defeatedCount >= 6) {
-            // Quest complete
             socket.emit('npcDialogue', {
-              npcId: npc.id,
-              npcName: npc.name,
-              npcType: npc.type,
+              npcId: npc.id, npcName: npc.name, npcType: npc.type,
               dialogue: [npc.dialogues.questComplete],
               hasChoice: false,
             });
-          } else if (player.questActive) {
-            // Quest already active
-            socket.emit('npcDialogue', {
-              npcId: npc.id,
-              npcName: npc.name,
-              npcType: npc.type,
-              dialogue: [npc.dialogues.questActive],
-              followUp: [`Progress: ${defeatedCount}/6 bosses defeated`],
-              hasChoice: false,
-            });
           } else {
-            // Offer quest
             socket.emit('npcDialogue', {
-              npcId: npc.id,
-              npcName: npc.name,
-              npcType: npc.type,
+              npcId: npc.id, npcName: npc.name, npcType: npc.type,
               dialogue: npc.dialogues.initial,
-              followUp: npc.dialogues.questOffer,
-              prompt: npc.dialogues.prompt,
-              hasChoice: true,
+              hasChoice: false,
             });
           }
         } else if (npc.type === 'shapeshifter') {

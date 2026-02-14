@@ -23,7 +23,7 @@ export const NPCS = {
   },
   quest_master: {
     id: 'quest_master',
-    name: 'Quest Master Seraphina',
+    name: 'Lorekeeper Seraphina',
     type: 'quest_master',
     x: 9800, y: 8800,
     radius: 18,
@@ -33,26 +33,14 @@ export const NPCS = {
     stationary: true,
     dialogues: {
       initial: [
-        "You have the look of someone searching for purpose. I am Seraphina — I keep the ledger of this realm's unfinished business.",
-        "Six bosses hold dominion over the zones beyond. Each one a tyrant. Each one... killable.",
-        "No one has defeated them all. Not yet.",
+        "I am Seraphina, keeper of this realm's history. Six great bosses hold dominion over the lands beyond.",
+        "The Blossom Behemoth chokes the Meadow. The Ancient Treant corrupts the Forest. The Magma Titan scorches the Volcanic Wastes.",
+        "The Frost Wyrm freezes the northern passes. The Crystal Golem guards untold power. And in the deepest dark... the Void Overlord waits.",
+        "Speak with Grimjaw if you seek to hunt them. He tracks every beast in these lands.",
       ],
-      questOffer: [
-        "Here is what stands between this world and peace:",
-        "The Blossom Behemoth chokes the Meadow. The Ancient Treant poisons the Forest.",
-        "The Magma Titan scorches the Volcanic Wastes. The Frost Wyrm freezes the northern passes.",
-        "The Crystal Golem guards power beyond measure. And in the deepest dark... the Void Overlord waits.",
-        "Bring me proof of their deaths. All six. Then this realm will know its first true Champion.",
-      ],
-      questActive: "The bosses still breathe. Check your quest log — and don't come back empty-handed.",
-      questComplete: "It's done. I... did not think I would live to see this day. You are the Champion of the Realm. Kneel for no one.",
-      prompt: "Will you hunt the six?",
-    },
-    quest: {
-      id: 'allBosses',
-      name: 'Champion of the Realm',
-      description: 'Defeat all 6 zone bosses to prove your worth.',
-      reward: { xp: 5000, title: 'Champion' },
+      questActive: "The hunt continues. Check your quest log — Grimjaw will have work for you.",
+      questComplete: "Every boss has fallen. You are the Champion of the Realm. Kneel for no one.",
+      prompt: "Seek out Grimjaw for bounties.",
     },
   },
   knight_commander: {
@@ -177,6 +165,14 @@ export const HUNT_QUESTS = [
   { id: 'hunt_yetis', name: 'The Frozen Siege', description: 'Yetis have sealed the northern passes. Grimjaw needs 15 brought down to reopen the trade routes.', target: 'yeti', zone: 'frozen', required: 15, reward: { maxHealth: 20 }, rewardText: '+20 Max HP', tier: 4 },
   { id: 'hunt_demons', name: 'Into the Abyss', description: 'Demons are spilling through rifts in the deepest zone. Only the strongest survive. Banish 10 back to the void.', target: 'demon', zone: 'abyss', required: 10, reward: { damagePercent: 10 }, rewardText: '+10% Damage', tier: 5 },
   { id: 'hunt_crystal_drakes', name: 'Shattered Scales', description: 'Crystal Drakes hoard magical energy that could power the Sanctuary. Defeat 12 and claim their resonance.', target: 'crystal_drake', zone: 'crystal_caves', required: 12, reward: { maxHealth: 15, damagePercent: 5 }, rewardText: '+15 Max HP, +5% Damage', tier: 4 },
+  // Boss kill quests
+  { id: 'boss_meadow', name: 'Cleanse the Meadow', description: 'The Blossom Behemoth corrupts the meadow flowers. Seek it out and end its blight.', target: 'boss_meadow', zone: 'meadow', required: 1, reward: { maxHealth: 10 }, rewardText: '+10 Max HP', tier: 2, isBoss: true },
+  { id: 'boss_forest', name: 'Fell the Ancient Treant', description: 'A massive Treant terrorizes the forest. Track it down and bring it to its roots.', target: 'boss_forest', zone: 'forest', required: 1, reward: { speed: 8 }, rewardText: '+8 Speed', tier: 2, isBoss: true },
+  { id: 'boss_volcanic', name: 'Quench the Magma Titan', description: 'The Magma Titan lords over the volcanic wastes. Only the brave dare challenge it.', target: 'boss_volcanic', zone: 'volcanic', required: 1, reward: { damagePercent: 8 }, rewardText: '+8% Damage', tier: 3, isBoss: true },
+  { id: 'boss_frozen', name: 'Slay the Frost Wyrm', description: 'The Frost Wyrm has sealed the northern passes. Bring it down to reopen the frozen expanse.', target: 'boss_frozen', zone: 'frozen', required: 1, reward: { maxHealth: 20 }, rewardText: '+20 Max HP', tier: 4, isBoss: true },
+  { id: 'boss_crystal', name: 'Shatter the Crystal Golem', description: 'Deep in the Crystal Caves, a Golem of living crystal guards an ancient power. Destroy it.', target: 'boss_crystal', zone: 'crystal_caves', required: 1, reward: { maxHealth: 15, damagePercent: 5 }, rewardText: '+15 Max HP, +5% Damage', tier: 4, isBoss: true },
+  { id: 'boss_abyss', name: 'Banish the Void Overlord', description: 'The Void Overlord threatens to consume the realm. Descend into the abyss and end it.', target: 'boss_abyss', zone: 'abyss', required: 1, reward: { damagePercent: 12 }, rewardText: '+12% Damage', tier: 5, isBoss: true },
+  { id: 'boss_dragon', name: 'Dragon Slayer', description: 'Enter the Dragon\'s Gauntlet and slay the Infernal Dragon. Only the mightiest wizards survive.', target: 'boss_dragon', zone: 'dungeon', required: 1, reward: { maxHealth: 30, damagePercent: 10 }, rewardText: '+30 Max HP, +10% Damage', tier: 5, isBoss: true },
 ];
 
 export const COLLECT_QUESTS = [
