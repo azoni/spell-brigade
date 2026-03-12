@@ -1,40 +1,17 @@
+const MCP_URL = process.env.MCP_URL || 'https://azoni-mcp.onrender.com';
+const MCP_KEY = process.env.MCP_ADMIN_KEY;
+
 /**
- * Activity logger - fire-and-forget POST to azoni.ai activity feed.
- * 
- * Usage:
- *   import { logActivity } from './activity-logger.js';
- *   
- *   logActivity({
- *     type: 'wizard_created',
- *     title: 'AI Wizard: Pepperoni Mage',
- *     description: 'Custom wizard class via Claude Sonnet',
- *     model: 'claude-sonnet-4',
- *     tokens: { prompt: 800, completion: 1200, total: 2000 },
- *     cost: 0.0144,
- *     metadata: { wizardName: 'Pepperoni Mage', prompt: 'pizza wizard' }
- *   });
+ * Fire-and-forget activity logger — logs to MCP ecosystem feed.
  */
-
-const ACTIVITY_WEBHOOK_URL = 'https://azoni.ai/.netlify/functions/log-agent-activity';
-const WEBHOOK_SECRET = process.env.AGENT_WEBHOOK_SECRET || '';
-
-export function logActivity({ type, title, description, reasoning, model, tokens, cost, metadata }) {
-  if (!WEBHOOK_SECRET) return;
-
-  fetch(ACTIVITY_WEBHOOK_URL, {
+export function logActivity({ type, title, description, model, tokens, cost, metadata }) {
+  if (!MCP_KEY) return;
+  fetch(`${MCP_URL}/activity/log`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MCP_KEY}` },
     body: JSON.stringify({
-      type,
-      title,
-      description: description || '',
-      reasoning: reasoning || '',
-      source: 'spell-brigade',
-      model,
-      tokens,
-      cost,
-      metadata: metadata || {},
-      secret: WEBHOOK_SECRET,
+      type, title, source: 'spell-brigade',
+      description: description || '', model, tokens, cost, metadata,
     }),
-  }).catch((e) => console.error('[activity-log] Failed:', e.message));
+  }).catch(e => console.error('[activity-log] Failed:', e.message));
 }
