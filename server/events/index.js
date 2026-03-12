@@ -17,6 +17,7 @@ import { savePlayerToDb, loadPlayerFromDb, sessionsDb, loadUserFromDb, getUnlock
 import { generateDungeon, generateDungeonLLM, sanitizeDungeonForClient } from '../dungeon-generator.js';
 import { generateWizard } from '../wizard-generator.js';
 import { llmGenerate, isLLMEnabled } from '../openrouter.js';
+import { logActivity } from '../activity-logger.js';
 
 export function registerSocketEvents(io) {
 io.on('connection', (socket) => {
@@ -395,7 +396,13 @@ io.on('connection', (socket) => {
     });
 
     console.log(`🧙 Player joined: ${player.name} (${player.class}) - Level ${player.level} - Skin: ${skin}`);
-    
+
+    logActivity({
+      type: 'game_started',
+      title: `Player joined: ${player.name}`,
+      description: `Class: ${player.class}, Level: ${player.level}`,
+    });
+
     // Broadcast join message to all players
     const joinMsg = {
       id: uuidv4(),
