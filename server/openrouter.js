@@ -153,6 +153,18 @@ async function callOpenRouter(systemPrompt, userPrompt, maxTokens, quality = 'pr
 
   // Activity logging (OpenRouter usage is in data.usage)
   const usage = data.usage || {};
+  const promptTokens = usage.prompt_tokens || 0;
+  const completionTokens = usage.completion_tokens || 0;
+
+  // Per-1M pricing for the OpenRouter models we use. Falls back to 0 for unknowns
+  // rather than guessing — better to undercount than to fabricate.
+  const PRICING = {
+    'anthropic/claude-3.5-haiku': [0.80, 4.00],
+    'anthropic/claude-sonnet-4-5': [3.00, 15.00],
+    'anthropic/claude-sonnet-4': [3.00, 15.00],
+  };
+  const [inRate, outRate] = PRICING[model] || [0, 0];
+  const computedCost = (promptTokens / 1e6) * inRate + (completionTokens / 1e6) * outRate;
 
   const activityType = context.type || (systemPrompt.includes('wizard') ? 'wizard_created' : systemPrompt.includes('dungeon') ? 'dungeon_created' : 'spell_brigade_ai');
   const activityTitle = context.type === 'dungeon_created'
@@ -165,11 +177,11 @@ async function callOpenRouter(systemPrompt, userPrompt, maxTokens, quality = 'pr
     description: parsed.description || '',
     model,
     tokens: {
-      prompt: usage.prompt_tokens || 0,
-      completion: usage.completion_tokens || 0,
-      total: (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+      prompt: promptTokens,
+      completion: completionTokens,
+      total: promptTokens + completionTokens,
     },
-    cost: usage.total_cost || 0,
+    cost: usage.total_cost || computedCost,
     metadata: { quality, name: parsed.name || null },
   });
 
